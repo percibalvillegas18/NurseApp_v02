@@ -1,0 +1,23 @@
+{
+  // Build-only config.
+  //
+  // tsconfig.json has no `include`, so `nest build` compiled everything in the
+  // project root - *.spec.ts, scripts/, prisma/seed.ts, test/ and
+  // mock-server.js. With files outside src/ in the program, tsc preserves the
+  // common root and emits dist/src/main.js instead of dist/main.js, which is
+  // why `npm run start:prod` and the Dockerfile CMD (node dist/main.js) both
+  // failed with MODULE_NOT_FOUND.
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "scripts",
+    "database",
+    "prisma",
+    "mock-server.js",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ],
+  "include": ["src/**/*.ts"]
+}
