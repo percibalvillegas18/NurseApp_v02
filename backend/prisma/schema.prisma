@@ -1,0 +1,732 @@
+// Hospital Nursing Workforce Management System - Prisma Schema
+// Supports multi-schema PostgreSQL (auth, rbac, audit, system)
+// Prisma v5.12+ with previewFeatures = ["multiSchema"]
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["auth", "rbac", "audit", "system", "nursing", "public"]
+}
+
+// ============================================================================
+// AUTH SCHEMA
+// ============================================================================
+
+model auth_users {
+  id                        BigInt    @id @default(autoincrement())
+  username                  String    @unique @db.VarChar(100)
+  email                     String    @unique @db.VarChar(255)
+  password_hash             String    @db.VarChar(255)
+  full_name                 String    @db.VarChar(255)
+  primary_role_id           BigInt?
+  status                    String    @default("Active") @db.VarChar(50)
+  email_verified            Boolean   @default(false)
+  email_verified_at         DateTime? @db.Timestamp()
+  last_login_at             DateTime? @db.Timestamp()
+  last_password_change_at   DateTime? @db.Timestamp()
+  failed_login_attempts     Int       @default(0)
+  locked_until              DateTime? @db.Timestamp()
+  created_by                BigInt?
+  created_at                DateTime  @default(now()) @db.Timestamp()
+  updated_by                BigInt?
+  updated_at                DateTime  @default(now()) @updatedAt @db.Timestamp()
+  deleted_at                DateTime? @db.Timestamp()
+
+  primary_role              system_hospital_roles? @relation("UserPrimaryRole", fields: [primary_role_id], references: [id])
+  user_role_assignments     auth_user_role_assignments[] @relation("UserAssignments")
+  sessions                  auth_sessions[]
+  data_scopes               rbac_user_data_scopes[]
+  nurse_record              nursing_nurses? @relation("NurseUser")
+  verified_credentials      nursing_credentials[] @relation("CredentialVerifier")
+
+  @@index([primary_role_id])
+  @@index([status])
+  @@map("users")
+  @@schema("auth")
+}
+
+model auth_user_role_assignments {
+  id              BigInt    @id @default(autoincrement())
+  user_id         BigInt
+  role_id         BigInt
+  assigned_by     BigInt
+  effective_from  DateTime? @db.Timestamp()
+  effective_to    DateTime? @db.Timestamp()
+  reason          String?   @db.Text
+  status          String    @default("Active") @db.VarChar(50)
+  created_at      DateTime  @default(now()) @db.Timestamp()
+  updated_at      DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  user            auth_users @relation("UserAssignments", fields: [user_id], references: [id], onDelete: Cascade)
+  role            system_hospital_roles @relation(fields: [role_id], references: [id], onDelete: Restrict)
+
+  @@unique([user_id, role_id])
+  @@index([user_id, status])
+  @@index([role_id, status])
+  @@index([effective_from, effective_to])
+  @@map("user_role_assignments")
+  @@schema("auth")
+}
+
+model auth_sessions {
+  id                    String    @id @db.VarChar(100)
+  user_id               BigInt
+  ip_address            String    @db.VarChar(45)
+  user_agent            String?   @db.VarChar(500)
+  login_at              DateTime  @default(now()) @db.Timestamp()
+  last_activity_at      DateTime  @default(now()) @db.Timestamp()
+  expires_at            DateTime  @db.Timestamp()
+  absolute_timeout_at   DateTime  @db.Timestamp()
+  status                String    @default("Active") @db.VarChar(50)
+  revoked_at            DateTime? @db.Timestamp()
+  revoked_reason        String?   @db.VarChar(255)
+  created_at            DateTime  @default(now()) @db.Timestamp()
+
+  user                  auth_users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([status])
+  @@index([expires_at])
+  @@map("sessions")
+  @@schema("auth")
+}
+
+// ============================================================================
+// SYSTEM SCHEMA
+// ============================================================================
+
+model system_hospital_roles {
+  id                    BigInt    @id @default(autoincrement())
+  code                  String    @unique @db.VarChar(50)
+  name                  String    @unique @db.VarChar(100)
+  description           String    @db.Text
+  category              String    @db.VarChar(50)
+  department            String?   @db.VarChar(100)
+  assignable_by_roles   String[]  @default(["SYSTEM_ADMIN"])
+  is_exclusive          Boolean   @default(true)
+  status                String    @default("Active") @db.VarChar(50)
+  created_at            DateTime  @default(now()) @db.Timestamp()
+  updated_at            DateTime  @default(now()) @updatedAt @db.Timestamp()
+  created_by            BigInt?
+  updated_by            BigInt?
+
+  users_primary         auth_users[] @relation("UserPrimaryRole")
+  assignments           auth_user_role_assignments[]
+  role_menu_access      rbac_role_menu_access[]
+  role_permissions      rbac_role_permissions[]
+  nurses_primary_role   nursing_nurses[]
+
+  @@index([category])
+  @@index([status])
+  @@map("hospital_roles")
+  @@schema("system")
+}
+
+model system_user_roles {
+  code        String   @id @db.VarChar(50)
+  name        String   @unique @db.VarChar(255)
+  description String?  @db.Text
+  status      String   @default("Active") @db.VarChar(50)
+  created_at  DateTime @default(now()) @db.Timestamp()
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  @@map("user_roles")
+  @@schema("system")
+}
+
+model system_error_codes {
+  code        String   @id @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  http_status Int
+  created_at  DateTime @default(now()) @db.Timestamp()
+
+  @@map("error_codes")
+  @@schema("system")
+}
+
+model system_audit_event_types {
+  code        String   @id @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  category    String   @db.VarChar(50)
+  risk_level  String   @default("Medium") @db.VarChar(50)
+  description String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp()
+
+  @@map("audit_event_types")
+  @@schema("system")
+}
+
+// ============================================================================
+// RBAC SCHEMA
+// ============================================================================
+
+model rbac_access_levels {
+  id                      BigInt    @id @default(autoincrement())
+  code                    String    @unique @db.VarChar(50)
+  name                    String    @unique @db.VarChar(255)
+  description             String    @db.Text
+  priority                Int       @default(50)
+  auto_assign             Boolean   @default(false)
+  override_allowed        Boolean   @default(true)
+  default_menu_behavior   String    @default("Configurable") @db.VarChar(50)
+  default_permission_set  Json?     @db.JsonB
+  default_data_scope_rule Json?     @db.JsonB
+  status                  String    @default("Active") @db.VarChar(50)
+  created_by              BigInt
+  created_at              DateTime  @default(now()) @db.Timestamp()
+  updated_by              BigInt
+  updated_at              DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  @@index([status])
+  @@index([priority])
+  @@map("access_levels")
+  @@schema("rbac")
+}
+
+model rbac_menus {
+  id                BigInt    @id @default(autoincrement())
+  code              String    @unique @db.VarChar(100)
+  name              String    @db.VarChar(255)
+  description       String?   @db.Text
+  parent_menu_id    BigInt?
+  display_order     Int       @default(0)
+  route             String?   @db.VarChar(500)
+  icon              String?   @db.VarChar(100)
+  is_functional     Boolean   @default(true)
+  is_external_link  Boolean   @default(false)
+  external_url      String?   @db.VarChar(500)
+  access_level      String    @default("Standard") @db.VarChar(50)
+  auto_assign       Boolean   @default(false)
+  status            String    @default("Active") @db.VarChar(50)
+  created_by        BigInt
+  created_at        DateTime  @default(now()) @db.Timestamp()
+  updated_by        BigInt
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  parent            rbac_menus? @relation("MenuHierarchy", fields: [parent_menu_id], references: [id])
+  children          rbac_menus[] @relation("MenuHierarchy")
+  role_menu_access  rbac_role_menu_access[]
+  role_permissions  rbac_role_permissions[]
+
+  @@index([parent_menu_id])
+  @@index([status])
+  @@index([display_order])
+  @@map("menus")
+  @@schema("rbac")
+}
+
+model rbac_permissions {
+  id          BigInt   @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @unique @db.VarChar(255)
+  description String   @db.Text
+  category    String   @default("Standard") @db.VarChar(50)
+  risk_level  String   @default("Medium") @db.VarChar(50)
+  status      String   @default("Active") @db.VarChar(50)
+  created_by  BigInt
+  created_at  DateTime @default(now()) @db.Timestamp()
+  updated_by  BigInt
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  role_permissions rbac_role_permissions[]
+
+  @@index([category])
+  @@index([risk_level])
+  @@index([status])
+  @@map("permissions")
+  @@schema("rbac")
+}
+
+model rbac_role_menu_access {
+  id                BigInt    @id @default(autoincrement())
+  role_code         String    @db.VarChar(50)
+  menu_id           BigInt
+  visible           Boolean   @default(false)
+  enabled           Boolean   @default(false)
+  assignment_source String    @default("AccessLevelDefault") @db.VarChar(50)
+  override_flag     Boolean   @default(false)
+  effective_from    DateTime? @db.Timestamp()
+  effective_to      DateTime? @db.Timestamp()
+  status            String    @default("Active") @db.VarChar(50)
+  created_by        BigInt
+  created_at        DateTime  @default(now()) @db.Timestamp()
+  updated_by        BigInt
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  role              system_hospital_roles @relation(fields: [role_code], references: [code], onDelete: Restrict)
+  menu              rbac_menus @relation(fields: [menu_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_code, menu_id])
+  @@index([role_code, status])
+  @@index([menu_id])
+  @@map("role_menu_access")
+  @@schema("rbac")
+}
+
+model rbac_role_permissions {
+  id                BigInt    @id @default(autoincrement())
+  role_code         String    @db.VarChar(50)
+  menu_id           BigInt
+  permission_id     BigInt
+  allowed           Boolean   @default(false)
+  source            String    @default("AccessLevelDefault") @db.VarChar(50)
+  override_flag     Boolean   @default(false)
+  effective_from    DateTime? @db.Timestamp()
+  effective_to      DateTime? @db.Timestamp()
+  status            String    @default("Active") @db.VarChar(50)
+  created_by        BigInt
+  created_at        DateTime  @default(now()) @db.Timestamp()
+  updated_by        BigInt
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  role              system_hospital_roles @relation(fields: [role_code], references: [code], onDelete: Restrict)
+  menu              rbac_menus @relation(fields: [menu_id], references: [id], onDelete: Cascade)
+  permission        rbac_permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_code, menu_id, permission_id])
+  @@index([role_code, status])
+  @@index([menu_id])
+  @@index([permission_id])
+  @@map("role_permissions")
+  @@schema("rbac")
+}
+
+model rbac_organizations {
+  id         BigInt   @id @default(autoincrement())
+  name       String   @unique @db.VarChar(255)
+  code       String   @unique @db.VarChar(50)
+  address    String?  @db.Text
+  city       String?  @db.VarChar(100)
+  state      String?  @db.VarChar(50)
+  country    String?  @db.VarChar(100)
+  status     String   @default("Active") @db.VarChar(50)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  departments rbac_departments[]
+  data_scopes rbac_user_data_scopes[]
+
+  @@map("organizations")
+  @@schema("rbac")
+}
+
+model rbac_departments {
+  id              BigInt   @id @default(autoincrement())
+  organization_id BigInt
+  name            String   @db.VarChar(255)
+  code            String   @db.VarChar(50)
+  status          String   @default("Active") @db.VarChar(50)
+  created_at      DateTime @default(now()) @db.Timestamp()
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  organization    rbac_organizations @relation(fields: [organization_id], references: [id])
+  nursing_units   rbac_nursing_units[]
+  data_scopes     rbac_user_data_scopes[]
+
+  @@unique([organization_id, code])
+  @@index([organization_id])
+  @@map("departments")
+  @@schema("rbac")
+}
+
+model rbac_nursing_units {
+  id            BigInt   @id @default(autoincrement())
+  department_id BigInt
+  name          String   @db.VarChar(255)
+  code          String   @db.VarChar(50)
+  unit_type     String?  @db.VarChar(100)
+  capacity      Int?
+  status        String   @default("Active") @db.VarChar(50)
+  created_at    DateTime @default(now()) @db.Timestamp()
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  department    rbac_departments @relation(fields: [department_id], references: [id])
+  posts         rbac_posts[]
+  data_scopes   rbac_user_data_scopes[]
+  home_nurses   nursing_nurses[]
+  roster_assignments nursing_roster_assignments[]
+
+  @@unique([department_id, code])
+  @@index([department_id])
+  @@map("nursing_units")
+  @@schema("rbac")
+}
+
+model rbac_posts {
+  id              BigInt   @id @default(autoincrement())
+  nursing_unit_id BigInt
+  name            String   @db.VarChar(255)
+  code            String   @db.VarChar(50)
+  post_type       String?  @db.VarChar(100)
+  status          String   @default("Active") @db.VarChar(50)
+  created_at      DateTime @default(now()) @db.Timestamp()
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  nursing_unit    rbac_nursing_units @relation(fields: [nursing_unit_id], references: [id])
+  data_scopes     rbac_user_data_scopes[]
+  roster_assignments nursing_roster_assignments[]
+
+  @@unique([nursing_unit_id, code])
+  @@index([nursing_unit_id])
+  @@map("posts")
+  @@schema("rbac")
+}
+
+model rbac_shifts {
+  id          BigInt   @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  code        String   @unique @db.VarChar(50)
+  start_time  DateTime @db.Time()
+  end_time    DateTime @db.Time()
+  description String?  @db.Text
+  status      String   @default("Active") @db.VarChar(50)
+  created_at  DateTime @default(now()) @db.Timestamp()
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  data_scopes rbac_user_data_scopes[]
+  roster_assignments nursing_roster_assignments[]
+
+  @@map("shifts")
+  @@schema("rbac")
+}
+
+model rbac_user_data_scopes {
+  id                      BigInt    @id @default(autoincrement())
+  user_id                 BigInt
+  scope_type              String    @db.VarChar(50)
+  organization_id         BigInt?
+  department_id           BigInt?
+  nursing_unit_id         BigInt?
+  post_id                 BigInt?
+  shift_id                BigInt?
+  assignment_rule         String?   @db.VarChar(255)
+  assignment_rule_config  Json?     @db.JsonB
+  effective_from          DateTime? @db.Timestamp()
+  effective_to            DateTime? @db.Timestamp()
+  status                  String    @default("Active") @db.VarChar(50)
+  created_by              BigInt
+  created_at              DateTime  @default(now()) @db.Timestamp()
+  updated_by              BigInt
+  updated_at              DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  user                    auth_users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization            rbac_organizations? @relation(fields: [organization_id], references: [id])
+  department              rbac_departments? @relation(fields: [department_id], references: [id])
+  nursing_unit            rbac_nursing_units? @relation(fields: [nursing_unit_id], references: [id])
+  post                    rbac_posts? @relation(fields: [post_id], references: [id])
+  shift                   rbac_shifts? @relation(fields: [shift_id], references: [id])
+
+  @@index([user_id])
+  @@index([scope_type])
+  @@index([organization_id])
+  @@index([department_id])
+  @@index([nursing_unit_id])
+  @@index([status])
+  @@map("user_data_scopes")
+  @@schema("rbac")
+}
+
+// ============================================================================
+// AUDIT SCHEMA
+// ============================================================================
+
+model audit_audit_logs {
+  id            BigInt   @id @default(autoincrement())
+  user_id       BigInt?
+  username      String?  @db.VarChar(100)
+  action        String   @db.VarChar(100)
+  entity_type   String   @db.VarChar(100)
+  entity_id     BigInt?
+  entity_code   String?  @db.VarChar(255)
+  description   String?  @db.Text
+  changes       Json?    @db.JsonB
+  reason        String?  @db.VarChar(500)
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?  @db.VarChar(500)
+  session_id    String?  @db.VarChar(100)
+  request_id    String?  @db.VarChar(100)
+  status        String   @default("Success") @db.VarChar(50)
+  error_message String?  @db.Text
+  created_at    DateTime @default(now()) @db.Timestamp()
+  /// SHA-256 hex of previous entry (or GENESIS). Set by DB trigger.
+  prev_hash     String?  @db.Text
+  /// SHA-256 hex of (prev_hash + canonical payload). Set by DB trigger.
+  entry_hash    String?  @db.Text
+
+  @@index([user_id])
+  @@index([action])
+  @@index([entity_type])
+  @@index([created_at(sort: Desc)])
+  @@index([entry_hash])
+  @@map("audit_logs")
+  @@schema("audit")
+}
+
+// ============================================================================
+// NURSING SCHEMA (V3 master data + V4 Contract Master / credentials)
+// ============================================================================
+
+model nursing_nurses {
+  id              BigInt    @id @default(autoincrement())
+  employee_number String    @unique @db.VarChar(50)
+  job_no          String    @unique @db.VarChar(50)
+  user_id         BigInt?   @unique
+  first_name      String    @db.VarChar(100)
+  middle_name     String?   @db.VarChar(100)
+  last_name       String    @db.VarChar(100)
+  gender          String?   @db.VarChar(50)
+  date_of_birth   DateTime? @db.Date
+  nationality     String?   @db.VarChar(100)
+  phone           String?   @db.VarChar(50)
+  hire_date       DateTime? @db.Date
+  employment_type String    @default("FullTime") @db.VarChar(50)
+  primary_role_id BigInt?
+  position_code   String?   @db.VarChar(10)
+  home_unit_id    BigInt?
+  status          String    @default("Active") @db.VarChar(50)
+  created_by      BigInt?
+  created_at      DateTime  @default(now()) @db.Timestamp()
+  updated_by      BigInt?
+  updated_at      DateTime  @default(now()) @updatedAt @db.Timestamp()
+  deleted_at      DateTime? @db.Timestamp()
+
+  user            auth_users? @relation("NurseUser", fields: [user_id], references: [id], onDelete: SetNull)
+  primary_role    system_hospital_roles? @relation(fields: [primary_role_id], references: [id])
+  home_unit       rbac_nursing_units? @relation(fields: [home_unit_id], references: [id])
+  credentials     nursing_credentials[]
+  roster_assignments nursing_roster_assignments[]
+  employment_contracts nursing_employment_contracts[]
+
+  @@index([status])
+  @@index([home_unit_id])
+  @@index([primary_role_id])
+  @@map("nurses")
+  @@schema("nursing")
+}
+
+model nursing_credentials {
+  id                BigInt    @id @default(autoincrement())
+  nurse_id          BigInt
+  template_code     String?   @db.VarChar(50)
+  tracking_data     Json      @default("{}") @db.JsonB
+  credential_type   String    @db.VarChar(50)
+  name              String    @db.VarChar(100)
+  issuing_authority String?   @db.VarChar(255)
+  credential_number String?   @db.VarChar(100)
+  issued_date       DateTime? @db.Date
+  expiry_date       DateTime? @db.Date
+  status            String    @default("PendingVerification") @db.VarChar(50)
+  verified_by       BigInt?
+  verified_at       DateTime? @db.Timestamp()
+  created_by        BigInt?
+  created_at        DateTime  @default(now()) @db.Timestamp()
+  updated_by        BigInt?
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamp()
+  deleted_at        DateTime? @db.Timestamp()
+
+  nurse             nursing_nurses @relation(fields: [nurse_id], references: [id], onDelete: Cascade)
+  verifier          auth_users? @relation("CredentialVerifier", fields: [verified_by], references: [id], onDelete: SetNull)
+  document          nursing_credential_documents?
+
+  @@unique([nurse_id, credential_type, name])
+  @@index([nurse_id])
+  @@index([status])
+  @@index([expiry_date])
+  @@map("credentials")
+  @@schema("nursing")
+}
+
+model nursing_roster_assignments {
+  id              BigInt    @id @default(autoincrement())
+  nurse_id        BigInt
+  nursing_unit_id BigInt
+  shift_id        BigInt
+  post_id         BigInt?
+  assignment_date DateTime  @db.Date
+  status          String    @default("Scheduled") @db.VarChar(50)
+  notes           String?   @db.Text
+  created_by      BigInt?
+  created_at      DateTime  @default(now()) @db.Timestamp()
+  updated_by      BigInt?
+  updated_at      DateTime  @default(now()) @updatedAt @db.Timestamp()
+  deleted_at      DateTime? @db.Timestamp()
+
+  nurse           nursing_nurses @relation(fields: [nurse_id], references: [id], onDelete: Cascade)
+  nursing_unit    rbac_nursing_units @relation(fields: [nursing_unit_id], references: [id], onDelete: Restrict)
+  shift           rbac_shifts @relation(fields: [shift_id], references: [id], onDelete: Restrict)
+  post            rbac_posts? @relation(fields: [post_id], references: [id], onDelete: SetNull)
+
+  @@unique([nurse_id, assignment_date, shift_id])
+  @@index([nurse_id])
+  @@index([assignment_date])
+  @@index([nursing_unit_id, assignment_date])
+  @@index([status])
+  @@map("roster_assignments")
+  @@schema("nursing")
+}
+
+// ============================================================================
+// CONTRACT MASTER (V4_0 – V4_2) + credential documents (V4_3)
+// Source of truth remains SQL migrations; these models enable typed reads.
+// active_span is GENERATED ALWAYS — intentionally omitted from Prisma.
+// ============================================================================
+
+model nursing_contract_agencies {
+  id          BigInt   @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  name_ar     String?  @db.VarChar(255)
+  description String?  @db.Text
+  agency_type String   @default("Other") @db.VarChar(50)
+  status      String   @default("Active") @db.VarChar(50)
+  created_at  DateTime @default(now()) @db.Timestamp()
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  contracts   nursing_employment_contracts[]
+
+  @@map("contract_agencies")
+  @@schema("nursing")
+}
+
+model nursing_positions {
+  id              BigInt   @id @default(autoincrement())
+  code            String   @unique @db.VarChar(50)
+  name            String   @db.VarChar(255)
+  description     String?  @db.Text
+  department_id   BigInt?
+  nursing_unit_id BigInt?
+  category        String?  @db.VarChar(100)
+  status          String   @default("Active") @db.VarChar(50)
+  created_at      DateTime @default(now()) @db.Timestamp()
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  contracts       nursing_employment_contracts[]
+
+  @@index([status])
+  @@index([nursing_unit_id])
+  @@map("positions")
+  @@schema("nursing")
+}
+
+model nursing_employment_contracts {
+  id                 BigInt    @id @default(autoincrement())
+  contract_number    String    @unique @db.VarChar(50)
+  nurse_id           BigInt
+  job_no             String?   @db.VarChar(50)
+  position_id        BigInt?
+  agency_id          BigInt
+  nursing_unit_id    BigInt?
+  department_id      BigInt?
+  contract_type      String    @default("FixedTerm") @db.VarChar(50)
+  status             String    @default("Draft") @db.VarChar(50)
+  start_date         DateTime  @db.Date
+  end_date           DateTime? @db.Date
+  probation_end_date DateTime? @db.Date
+  renewal_of_id      BigInt?
+  notes              String?   @db.Text
+  activated_at       DateTime? @db.Timestamp()
+  activated_by       BigInt?
+  terminated_at      DateTime? @db.Timestamp()
+  terminated_by      BigInt?
+  termination_reason String?   @db.Text
+  approved_at        DateTime? @db.Timestamp()
+  approved_by        BigInt?
+  created_by         BigInt?
+  updated_by         BigInt?
+  created_at         DateTime  @default(now()) @db.Timestamp()
+  updated_at         DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  nurse              nursing_nurses @relation(fields: [nurse_id], references: [id], onDelete: Restrict)
+  agency             nursing_contract_agencies @relation(fields: [agency_id], references: [id], onDelete: Restrict)
+  position           nursing_positions? @relation(fields: [position_id], references: [id], onDelete: SetNull)
+  renewal_of         nursing_employment_contracts? @relation("ContractRenewal", fields: [renewal_of_id], references: [id], onDelete: SetNull)
+  renewals           nursing_employment_contracts[] @relation("ContractRenewal")
+  status_history     nursing_contract_status_history[]
+  documents          nursing_contract_documents[]
+  alerts             nursing_contract_alerts[]
+
+  @@index([nurse_id])
+  @@index([status])
+  @@index([agency_id])
+  @@index([end_date])
+  @@index([job_no])
+  @@map("employment_contracts")
+  @@schema("nursing")
+}
+
+model nursing_contract_status_history {
+  id          BigInt   @id @default(autoincrement())
+  contract_id BigInt
+  from_status String?  @db.VarChar(50)
+  to_status   String   @db.VarChar(50)
+  reason      String?  @db.Text
+  changed_by  BigInt?
+  changed_at  DateTime @default(now()) @db.Timestamp()
+
+  contract    nursing_employment_contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+
+  @@index([contract_id])
+  @@map("contract_status_history")
+  @@schema("nursing")
+}
+
+model nursing_contract_documents {
+  id          BigInt   @id @default(autoincrement())
+  contract_id BigInt
+  doc_type    String   @default("SignedContract") @db.VarChar(100)
+  title       String?  @db.VarChar(255)
+  file_name   String?  @db.VarChar(255)
+  storage_ref String?  @db.VarChar(500)
+  mime_type   String?  @db.VarChar(100)
+  notes       String?  @db.Text
+  uploaded_by BigInt?
+  uploaded_at DateTime @default(now()) @db.Timestamp()
+  status      String   @default("Active") @db.VarChar(50)
+
+  contract    nursing_employment_contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+
+  @@index([contract_id])
+  @@map("contract_documents")
+  @@schema("nursing")
+}
+
+model nursing_contract_alerts {
+  id              BigInt    @id @default(autoincrement())
+  contract_id     BigInt
+  alert_type      String    @db.VarChar(50)
+  severity        String    @default("Warning") @db.VarChar(20)
+  threshold_days  Int?
+  message         String    @db.Text
+  end_date        DateTime? @db.Date
+  acknowledged    Boolean   @default(false)
+  acknowledged_by BigInt?
+  acknowledged_at DateTime? @db.Timestamp()
+  created_at      DateTime  @default(now()) @db.Timestamp()
+
+  contract        nursing_employment_contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+
+  @@unique([contract_id, alert_type, threshold_days])
+  @@index([contract_id])
+  @@map("contract_alerts")
+  @@schema("nursing")
+}
+
+model nursing_credential_documents {
+  credential_id BigInt   @id
+  file_name     String   @db.VarChar(255)
+  media_type    String   @db.VarChar(100)
+  content       Bytes
+  uploaded_by   BigInt
+  uploaded_at   DateTime @default(now()) @db.Timestamptz()
+
+  credential    nursing_credentials @relation(fields: [credential_id], references: [id], onDelete: Cascade)
+
+  @@map("credential_documents")
+  @@schema("nursing")
+}
