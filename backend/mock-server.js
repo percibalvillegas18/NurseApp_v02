@@ -1339,10 +1339,26 @@ let nextNurseId = 5;
 let nextCredentialId = 7;
 let nextRosterId = 9;
 
+const mockDepartments = [
+  { id: 10, code: 'ICU', name: 'Intensive Care' },
+  { id: 20, code: 'ER', name: 'Emergency' },
+];
+// Staff positions (mirrors STAFF_POSITIONS in Nest staff-catalog.ts)
+const mockPositions = [
+  { code: 'HN', name: 'Head Nurse' },
+  { code: 'AHN', name: 'Asst. Head Nurse' },
+  { code: 'CI', name: 'Clinical Instructor' },
+  { code: 'SN', name: 'Staff Nurse' },
+  { code: 'PCT', name: 'Patient Care Tech' },
+  { code: 'TEC', name: 'ECG Technician' },
+  { code: 'CN', name: 'Charge Nurse' },
+  { code: 'HCA', name: 'Health Care Asst.' },
+  { code: 'MW', name: 'Midwife' },
+];
 const mockUnits = [
-  { id: 1, code: 'ICU_A', name: 'ICU Unit A' },
-  { id: 2, code: 'ICU_B', name: 'ICU Unit B' },
-  { id: 3, code: 'ER_TRIAGE', name: 'ER Triage' },
+  { id: 1, code: 'ICU_A', name: 'ICU Unit A', department_id: 10 },
+  { id: 2, code: 'ICU_B', name: 'ICU Unit B', department_id: 10 },
+  { id: 3, code: 'ER_TRIAGE', name: 'ER Triage', department_id: 20 },
 ];
 const mockShifts = [
   { id: 1, code: 'MORNING', name: 'Morning Shift', start_time: '07:00', end_time: '15:00' },
@@ -1390,10 +1406,10 @@ const COUNTRIES = [
 ];
 
 const mockNurses = [
-  { id: 1, employeeNumber: 'EMP-1001', jobNo: 'JOB-1001', firstName: 'Maria', middleName: 'Josefa', lastName: 'Garcia', gender: 'Female', dateOfBirth: '1990-04-12', nationality: 'Filipino', phone: '+966-50-111-2233', hireDate: '2019-03-01', employmentType: 'FullTime', status: 'Active', userId: 4, username: 'maria.garcia', primaryRole: { id: 1, code: 'RN', name: 'Registered Nurse' }, homeUnit: mockUnits[0], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 2, employeeNumber: 'EMP-1002', jobNo: 'JOB-1002', firstName: 'Ahmed', middleName: null, lastName: 'Hassan', gender: 'Male', dateOfBirth: '1988-11-03', nationality: 'Saudi', phone: '+966-50-222-3344', hireDate: '2020-06-15', employmentType: 'FullTime', status: 'Active', userId: 5, username: 'ahmed.hassan', primaryRole: { id: 1, code: 'RN', name: 'Registered Nurse' }, homeUnit: mockUnits[0], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 3, employeeNumber: 'EMP-1003', jobNo: 'JOB-1003', firstName: 'Jennifer', middleName: 'Anne', lastName: 'Smith', gender: 'Female', dateOfBirth: '1993-07-22', nationality: 'American', phone: '+966-50-333-4455', hireDate: '2021-09-01', employmentType: 'PartTime', status: 'Active', userId: 6, username: 'jennifer.smith', primaryRole: { id: 2, code: 'LPN', name: 'Licensed Practical Nurse' }, homeUnit: mockUnits[0], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 4, employeeNumber: 'EMP-1004', jobNo: 'JOB-1004', firstName: 'David', middleName: null, lastName: 'Kim', gender: 'Male', dateOfBirth: '1991-02-14', nationality: 'South Korean', phone: '+966-50-444-5566', hireDate: '2022-01-10', employmentType: 'FullTime', status: 'Active', userId: 7, username: 'david.kim', primaryRole: { id: 3, code: 'CNA', name: 'Certified Nursing Assistant' }, homeUnit: mockUnits[1], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 1, employeeNumber: 'EMP-1001', jobNo: 'JOB-1001', firstName: 'Maria', middleName: 'Josefa', lastName: 'Garcia', gender: 'Female', dateOfBirth: '1990-04-12', nationality: 'Filipino', phone: '+966-50-111-2233', hireDate: '2019-03-01', employmentType: 'FullTime', status: 'Active', userId: 4, username: 'maria.garcia', primaryRole: { id: 1, code: 'RN', name: 'Registered Nurse' }, positionCode: 'SN', homeUnit: mockUnits[0], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 2, employeeNumber: 'EMP-1002', jobNo: 'JOB-1002', firstName: 'Ahmed', middleName: null, lastName: 'Hassan', gender: 'Male', dateOfBirth: '1988-11-03', nationality: 'Saudi', phone: '+966-50-222-3344', hireDate: '2020-06-15', employmentType: 'FullTime', status: 'Active', userId: 5, username: 'ahmed.hassan', primaryRole: { id: 1, code: 'RN', name: 'Registered Nurse' }, positionCode: 'SN', homeUnit: mockUnits[0], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 3, employeeNumber: 'EMP-1003', jobNo: 'JOB-1003', firstName: 'Jennifer', middleName: 'Anne', lastName: 'Smith', gender: 'Female', dateOfBirth: '1993-07-22', nationality: 'American', phone: '+966-50-333-4455', hireDate: '2021-09-01', employmentType: 'PartTime', status: 'Active', userId: 6, username: 'jennifer.smith', primaryRole: { id: 2, code: 'LPN', name: 'Licensed Practical Nurse' }, positionCode: 'HCA', homeUnit: mockUnits[0], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 4, employeeNumber: 'EMP-1004', jobNo: 'JOB-1004', firstName: 'David', middleName: null, lastName: 'Kim', gender: 'Male', dateOfBirth: '1991-02-14', nationality: 'South Korean', phone: '+966-50-444-5566', hireDate: '2022-01-10', employmentType: 'FullTime', status: 'Active', userId: 7, username: 'david.kim', primaryRole: { id: 3, code: 'CNA', name: 'Certified Nursing Assistant' }, positionCode: 'PCT', homeUnit: mockUnits[1], _deleted: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 const mockCredentials = [
@@ -1452,6 +1468,10 @@ function mockUserEmail(userId) {
   return u ? u.email : null;
 }
 function mapMockNurse(n) {
+  // Resolve through the master lists so department/position stay consistent
+  // with lookups (same shape as Nest mapNurseRow).
+  const homeUnit = n.homeUnit ? mockUnits.find((u) => u.id === n.homeUnit.id) || n.homeUnit : null;
+  const dept = homeUnit ? mockDepartments.find((d) => d.id === homeUnit.department_id) : null;
   return {
     id: n.id, employeeNumber: n.employeeNumber, jobNo: n.jobNo || null, firstName: n.firstName,
     middleName: n.middleName || null, lastName: n.lastName,
@@ -1461,7 +1481,9 @@ function mapMockNurse(n) {
     // Email is sourced from the linked login account (auth.users)
     email: mockUserEmail(n.userId), phone: n.phone, hireDate: n.hireDate,
     employmentType: n.employmentType, status: n.status, userId: n.userId, username: n.username,
-    primaryRole: n.primaryRole, homeUnit: n.homeUnit,
+    primaryRole: n.primaryRole, positionCode: n.positionCode || null,
+    department: dept ? { id: dept.id, name: dept.name } : null,
+    homeUnit: homeUnit ? { id: homeUnit.id, code: homeUnit.code, name: homeUnit.name, departmentId: homeUnit.department_id } : null,
     ...summarizeMockCredentials(n.id),
     createdAt: n.createdAt, updatedAt: n.updatedAt,
   };
@@ -1486,7 +1508,7 @@ function mapMockRoster(a) {
 app.get('/api/v1/nursing/lookups', (req, res) => {
   res.json({
     success: true,
-    data: { roles: mockNurseRoles, units: mockUnits, shifts: mockShifts, posts: mockPosts, countries: COUNTRIES },
+    data: { positions: mockPositions, departments: mockDepartments, roles: mockNurseRoles, units: mockUnits, shifts: mockShifts, posts: mockPosts, countries: COUNTRIES },
     timestamp: new Date().toISOString(),
   });
 });
@@ -1605,6 +1627,7 @@ app.post('/api/v1/nursing/nurses', (req, res) => {
     userId: b.user_id || null,
     username: linkedUser ? linkedUser.username : null,
     primaryRole: role ? { id: role.id, code: role.code, name: role.name } : null,
+    positionCode: b.position_code || null,
     homeUnit: unit,
     _deleted: false,
     createdAt: new Date().toISOString(),
@@ -1651,6 +1674,7 @@ app.patch('/api/v1/nursing/nurses/:id', (req, res) => {
     const role = mockNurseRoles.find((r) => r.id === b.primary_role_id);
     nurse.primaryRole = role ? { id: role.id, code: role.code, name: role.name } : null;
   }
+  if (b.position_code !== undefined) nurse.positionCode = b.position_code || null;
   if (b.home_unit_id !== undefined) nurse.homeUnit = mockUnits.find((u) => u.id === b.home_unit_id) || null;
   nurse.updatedAt = new Date().toISOString();
   res.json({ success: true, data: { nurse: mapMockNurse(nurse) }, timestamp: new Date().toISOString() });
