@@ -66,6 +66,14 @@ class FakePrisma {
       },
       create: async (args: any) => {
         this.calls.push('users.create');
+        // Mirror the DB unique constraints: createUser relies on P2002 (not a
+        // pre-check) to detect duplicate username/email (H-8/M-11 fix).
+        if (this.users.some((u) => u.username === args.data.username)) {
+          throw { code: 'P2002', meta: { target: ['username'] } };
+        }
+        if (this.users.some((u) => u.email === args.data.email)) {
+          throw { code: 'P2002', meta: { target: ['email'] } };
+        }
         const row = {
           id: Math.max(...this.users.map((u) => u.id)) + 1,
           created_at: new Date(),
@@ -125,6 +133,10 @@ class FakePrisma {
       ],
     };
   }
+
+  // updateUser wraps role reassignment in $transaction (H-9 fix); mirror the
+  // mock branch of PrismaService.$transaction by passing the fake itself.
+  $transaction = async (fn: any) => fn(this);
 }
 
 let service: UsersService;

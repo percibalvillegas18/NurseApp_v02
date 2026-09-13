@@ -22,6 +22,9 @@ describe('Staff credential tracking', () => {
       rbac_nursing_units: { findFirst: jest.fn(async ({ where }) => where.id === 3 ? { id: 3 } : null) },
       rbac_user_data_scopes: { findMany: jest.fn(async () => [{ scope_type: 'All' }]) },
       $queryRawUnsafe: jest.fn(async () => []),
+      // verifyCredential wraps read+update in $transaction (H-7 fix); mirror
+      // the mock branch of PrismaService.$transaction by passing the fake itself.
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
     };
     service = new NursingService(prisma, { log: jest.fn() } as any);
   });

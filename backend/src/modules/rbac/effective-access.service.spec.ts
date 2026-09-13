@@ -250,7 +250,9 @@ describe('INTEGRATION - Real DB Tests (requires TEST_DATABASE_URL)', () => {
     if (prisma) await prisma.$disconnect();
   });
 
-  const itDb: jest.It = hasDb ? it : it.skip;
+  // No annotation: `it` comes from @jest/globals (It) while `it.skip` is ItBase —
+  // the union is callable with (name, fn) either way.
+  const itDb = hasDb ? it : it.skip;
 
   itDb('ICU nurse should NOT access Medical Ward resource', async () => {
     // user 3 = RN scoped to unit 1 (ICU_A); resource 2 = Medical Ward

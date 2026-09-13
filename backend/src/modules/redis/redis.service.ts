@@ -406,7 +406,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     for (const roleCode of roleCodes) {
       const key = this.buildRoleUsersKey(roleCode);
       try {
-        await client.sAdd(key, String(userId));
+        await client.sadd(key, String(userId));
         await client.expire(key, 3600); // 1h tracking TTL
       } catch (error) {
         this.logger.warn(`Failed to track user ${userId} for role ${roleCode}: ${error.message}`);

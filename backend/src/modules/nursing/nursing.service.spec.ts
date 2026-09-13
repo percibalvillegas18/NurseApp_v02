@@ -237,6 +237,13 @@ class FakePrisma {
     findFirst: async ({ where }: any) => this.shifts.find(s => s.id === where.id) ?? null,
   };
   rbac_posts = { findMany: async () => [], findFirst: async () => null };
+  // Transaction support: run the callback against this fake (mirrors the mock
+  // branch of PrismaService.$transaction, which passes `this`).
+  $transaction = async (fn: any) => fn(this);
+  // Raw-query support: the roster contract guard
+  // (SELECT nursing.nurse_has_valid_contract(...) AS ok) always passes here;
+  // guard-denial paths are covered against a real DB, not this fake.
+  $queryRawUnsafe = async () => [{ ok: true }];
 }
 
 describe('NURSING SERVICE', () => {

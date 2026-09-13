@@ -896,7 +896,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // For transaction support (mock)
-  async $transaction<T>(fn: (prisma: Pick<PrismaService, '$queryRawUnsafe' | '$executeRawUnsafe'>) => Promise<T>): Promise<T> {
+  // NOTE: the tx client exposes raw queries plus the model delegates used
+  // inside transactions (verifyCredential, update-user-roles). At runtime the
+  // real Prisma tx client and the mock (`this`) both provide these.
+  async $transaction<T>(fn: (prisma: Pick<PrismaService, '$queryRawUnsafe' | '$executeRawUnsafe' | 'nursing_credentials' | 'auth_user_role_assignments'>) => Promise<T>): Promise<T> {
     const client = this.getClient();
     if (client && !this.isMock) {
       return client.$transaction(fn);
