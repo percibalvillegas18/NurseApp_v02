@@ -2013,12 +2013,25 @@ app.post('/api/v1/nursing/roster', (req, res) => {
     return res.status(400).json({ success: false, message: 'nurse_id, nursing_unit_id, shift_id, assignment_date are required', timestamp: new Date().toISOString() });
   }
   const date = String(b.assignment_date).slice(0, 10);
-  if (mockRoster.some((a) => a.nurseId === b.nurse_id && a.assignmentDate === date && a.shiftId === b.shift_id && a.status !== 'Cancelled')) {
-    return res.status(409).json({ success: false, message: 'Nurse #' + b.nurse_id + ' is already assigned to that shift on ' + date, timestamp: new Date().toISOString() });
-  }
+  // Reference validation mirrors Nest validateRosterAssignmentScope()
   const nurse = mockNurses.find((n) => n.id === b.nurse_id && !n._deleted);
   if (!nurse) {
     return res.status(404).json({ success: false, message: 'Nurse #' + b.nurse_id + ' not found', timestamp: new Date().toISOString() });
+  }
+  const unit = mockUnits.find((u) => u.id === b.nursing_unit_id);
+  if (!unit) {
+    return res.status(400).json({ success: false, message: 'Select an active nursing unit', timestamp: new Date().toISOString() });
+  }
+  const shift = mockShifts.find((x) => x.id === b.shift_id);
+  if (!shift) {
+    return res.status(400).json({ success: false, message: 'Select an active shift', timestamp: new Date().toISOString() });
+  }
+  const post = b.post_id == null ? null : mockPosts.find((x) => x.id === b.post_id);
+  if (b.post_id != null && !post) {
+    return res.status(400).json({ success: false, message: 'Select an active post', timestamp: new Date().toISOString() });
+  }
+  if (post && post.nursing_unit_id !== unit.id) {
+    return res.status(400).json({ success: false, message: 'The selected post does not belong to the nursing unit', timestamp: new Date().toISOString() });
   }
   // Roster ↔ contract guard (parity with Nest assertNurseHasValidContract)
   if (typeof app.locals.hasValidContract === 'function' && !app.locals.hasValidContract(b.nurse_id, date)) {
@@ -2027,6 +2040,10 @@ app.post('/api/v1/nursing/roster', (req, res) => {
       message: 'Nurse #' + b.nurse_id + ' has no valid Active employment contract covering ' + date + '. Update Contract Master before rostering.',
       timestamp: new Date().toISOString(),
     });
+  }
+  // Double-booking is the DB unique guard in Nest, so it runs last here too
+  if (mockRoster.some((a) => a.nurseId === b.nurse_id && a.assignmentDate === date && a.shiftId === b.shift_id && a.status !== 'Cancelled')) {
+    return res.status(409).json({ success: false, message: 'Nurse #' + b.nurse_id + ' is already assigned to that shift on ' + date, timestamp: new Date().toISOString() });
   }
   const created = {
     id: nextRosterId++,
@@ -2053,8 +2070,26 @@ app.patch('/api/v1/nursing/roster/:id', (req, res) => {
   const newDate = b.assignment_date ? String(b.assignment_date).slice(0, 10) : asg.assignmentDate;
   const newShiftId = b.shift_id !== undefined ? b.shift_id : asg.shiftId;
   const newNurseId = b.nurse_id !== undefined ? b.nurse_id : asg.nurseId;
-  if (mockRoster.some((a) => a.id !== asg.id && a.nurseId === newNurseId && a.assignmentDate === newDate && a.shiftId === newShiftId && a.status !== 'Cancelled')) {
-    return res.status(409).json({ success: false, message: 'That change would double-book the nurse on this shift/date', timestamp: new Date().toISOString() });
+  const newUnitId = b.nursing_unit_id !== undefined ? b.nursing_unit_id : asg.unitId;
+  const newPostId = b.post_id !== undefined ? b.post_id : asg.postId;
+  // Reference validation mirrors Nest validateRosterAssignmentScope()
+  if (b.nurse_id !== undefined && !mockNurses.some((n) => n.id === newNurseId && !n._deleted)) {
+    return res.status(404).json({ success: false, message: 'Nurse #' + newNurseId + ' not found', timestamp: new Date().toISOString() });
+  }
+  if (b.nursing_unit_id !== undefined && !mockUnits.some((u) => u.id === newUnitId)) {
+    return res.status(400).json({ success: false, message: 'Select an active nursing unit', timestamp: new Date().toISOString() });
+  }
+  if (b.shift_id !== undefined && !mockShifts.some((x) => x.id === newShiftId)) {
+    return res.status(400).json({ success: false, message: 'Select an active shift', timestamp: new Date().toISOString() });
+  }
+  if (newPostId != null) {
+    const post = mockPosts.find((x) => x.id === newPostId);
+    if (!post) {
+      return res.status(400).json({ success: false, message: 'Select an active post', timestamp: new Date().toISOString() });
+    }
+    if (post.nursing_unit_id !== newUnitId) {
+      return res.status(400).json({ success: false, message: 'The selected post does not belong to the nursing unit', timestamp: new Date().toISOString() });
+    }
   }
   // Roster ↔ contract guard on update (nurse and/or date may change)
   if (typeof app.locals.hasValidContract === 'function' && !app.locals.hasValidContract(newNurseId, newDate)) {
@@ -2063,6 +2098,9 @@ app.patch('/api/v1/nursing/roster/:id', (req, res) => {
       message: 'Nurse #' + newNurseId + ' has no valid Active employment contract covering ' + newDate + '. Update Contract Master before rostering.',
       timestamp: new Date().toISOString(),
     });
+  }
+  if (mockRoster.some((a) => a.id !== asg.id && a.nurseId === newNurseId && a.assignmentDate === newDate && a.shiftId === newShiftId && a.status !== 'Cancelled')) {
+    return res.status(409).json({ success: false, message: 'That change would double-book the nurse on this shift/date', timestamp: new Date().toISOString() });
   }
   asg.nurseId = newNurseId;
   asg.shiftId = newShiftId;
