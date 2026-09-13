@@ -1355,6 +1355,68 @@ const mockPositions = [
   { code: 'HCA', name: 'Health Care Asst.' },
   { code: 'MW', name: 'Midwife' },
 ];
+// Credential templates (mirrors CREDENTIAL_TEMPLATES in Nest staff-catalog.ts)
+const mockCredentialTemplates = [
+  { code: 'PASSPORT', name: 'Passport', category: 'Identity & Legal', credentialType: 'Identity',
+    description: 'Government-issued document verifying international identity and nationality.',
+    numberLabel: 'Document Number', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'issuingCountry', label: 'Issuing Country', type: 'text' }] },
+  { code: 'IQAMA', name: 'Resident ID (Iqama)', category: 'Identity & Legal', credentialType: 'Identity',
+    description: 'Saudi residency permit proving legal permission to live and work.',
+    numberLabel: 'Iqama Number', authorityLabel: 'Sponsor/Employer Name', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date (Gregorian)',
+    fields: [{ key: 'expiryDateHijri', label: 'Expiry Date (Hijri, YYYY-MM-DD)', type: 'text' }, { key: 'jobTitle', label: 'Job Title', type: 'text' }] },
+  { code: 'HOSPITAL_ID', name: 'Hospital ID', category: 'Identity & Legal', credentialType: 'Identity',
+    description: 'Internal facility badge verifying employee role, department, and access.',
+    numberLabel: 'Employee ID Number', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'departmentCostCenter', label: 'Department/Cost Center', type: 'text' }, { key: 'accessLevel', label: 'Access Level', type: 'text' }] },
+  { code: 'PROFESSIONAL_LICENSE', name: 'Professional License', category: 'Licensure', credentialType: 'License',
+    description: 'Nursing/medical license issued by the home country or previous country.',
+    numberLabel: 'License Number', authorityLabel: 'Issuing Board', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'issuingCountry', label: 'Issuing Country', type: 'text' }, { key: 'psvStatus', label: 'PSV Status (DataFlow)', type: 'select', options: ['Not Started', 'In Progress', 'Verified', 'Discrepancy', 'Unable to Verify'] }] },
+  { code: 'SCFHS', name: 'Saudi Council License', category: 'Licensure', credentialType: 'License',
+    description: 'National practice license issued by the Saudi Commission for Health Specialties.',
+    numberLabel: 'SCFHS Registration Number', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'professionalClassification', label: 'Professional Classification', type: 'text' }] },
+  { code: 'EMPLOYMENT_CONTRACT', name: 'Employment Contract', category: 'Liability & Clearance', credentialType: 'Contract',
+    description: 'Legal agreement between healthcare worker and hiring entity (MOH/SOP/Agency).',
+    numberLabel: 'Contract ID', authorityLabel: 'Contracting Agency', issuedLabel: 'Start Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'probationEndDate', label: 'Probation End Date', type: 'date' }] },
+  { code: 'MALPRACTICE', name: 'Medical Malpractice', category: 'Liability & Clearance', credentialType: 'Insurance',
+    description: 'Professional liability coverage protecting against claims of medical negligence.',
+    numberLabel: 'Policy Number', authorityLabel: 'Insurance Provider', issuedLabel: 'Effective Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'coverageAmount', label: 'Coverage Amount', type: 'number' }, { key: 'coverageCurrency', label: 'Coverage Currency', type: 'text' }] },
+  { code: 'STAFF_CLEARANCE', name: 'Staff Clearance', category: 'Liability & Clearance', credentialType: 'Clearance',
+    description: 'Background checks, health screenings, and onboarding clearance.',
+    numberLabel: 'Clearance Form ID', issuedLabel: 'Approval Date',
+    fields: [{ key: 'medicalFitnessStatus', label: 'Medical Fitness Status', type: 'select', options: ['Pending', 'Fit', 'Fit with Restrictions', 'Unfit'] }, { key: 'backgroundCheckStatus', label: 'Background Check Status', type: 'select', options: ['Pending', 'Passed', 'Failed'] }] },
+  { code: 'CORE_COMPETENCY', name: 'Core Generic Competency', category: 'Clinical Competency', credentialType: 'Competency',
+    description: 'Assessment of foundational clinical skills required of all staff.',
+    issuedLabel: 'Assessment Date', expiryLabel: 'Next Reassessment Due Date',
+    fields: [{ key: 'evaluatorName', label: 'Evaluator Name', type: 'text' }, { key: 'assessmentStatus', label: 'Pass/Fail Status', type: 'select', options: ['Pass', 'Fail', 'Pending'] }] },
+  { code: 'UNIT_COMPETENCY', name: 'Unit Specific Competency', category: 'Clinical Competency', credentialType: 'Competency',
+    description: 'Specialized skills checklist tailored to the assigned department.',
+    issuedLabel: 'Assessment Date', expiryLabel: 'Next Reassessment Date',
+    fields: [{ key: 'assignedUnitId', label: 'Assigned Unit', type: 'unit' }, { key: 'evaluatorName', label: 'Evaluator Name', type: 'text' }, { key: 'assessmentStatus', label: 'Pass/Fail Status', type: 'select', options: ['Pass', 'Fail', 'Pending'] }] },
+  { code: 'CONSCIOUS_SEDATION', name: 'Conscious Sedation', category: 'Clinical Competency', credentialType: 'Certification',
+    description: 'Certification for safely administering and monitoring moderate sedation.',
+    numberLabel: 'Certificate Number', authorityLabel: 'Certifying Department', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date',
+    fields: [{ key: 'supervisedCasesCount', label: 'Supervised Cases Count', type: 'number' }] },
+  { code: 'BLS', name: 'BLS', category: 'Life Support', credentialType: 'Certification',
+    description: 'CPR, AED use, and basic life-saving skills.',
+    numberLabel: 'Certificate Number', authorityLabel: 'Training Provider', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date', fields: [] },
+  { code: 'ACLS', name: 'ACLS', category: 'Life Support', credentialType: 'Certification',
+    description: 'Management of severe adult cardiovascular emergencies.',
+    numberLabel: 'Certificate Number', authorityLabel: 'Training Provider', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date', fields: [] },
+  { code: 'PALS', name: 'PALS', category: 'Life Support', credentialType: 'Certification',
+    description: 'Recognition and intervention in pediatric emergencies.',
+    numberLabel: 'Certificate Number', authorityLabel: 'Training Provider', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date', fields: [] },
+  { code: 'NRP', name: 'NRP', category: 'Life Support', credentialType: 'Certification',
+    description: 'Assessment, resuscitation, and stabilization of newborns.',
+    numberLabel: 'Certificate Number', authorityLabel: 'Training Provider', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date', fields: [] },
+  { code: 'BICSL', name: 'BICSL', category: 'Life Support', credentialType: 'Certification',
+    description: 'Basic infection control skills.',
+    numberLabel: 'Certificate Number', authorityLabel: 'Training Facility', issuedLabel: 'Issue Date', expiryLabel: 'Expiry Date', fields: [] },
+];
 const mockUnits = [
   { id: 1, code: 'ICU_A', name: 'ICU Unit A', department_id: 10 },
   { id: 2, code: 'ICU_B', name: 'ICU Unit B', department_id: 10 },
@@ -1413,12 +1475,12 @@ const mockNurses = [
 ];
 
 const mockCredentials = [
-  { id: 1, nurseId: 1, credentialType: 'License', name: 'RN_LICENSE', issuingAuthority: 'SCFHS', credentialNumber: 'RN-88231', issuedDate: '2023-01-15', expiryDate: isoDay(400), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 2, nurseId: 2, credentialType: 'License', name: 'RN_LICENSE', issuingAuthority: 'SCFHS', credentialNumber: 'RN-90417', issuedDate: '2022-06-01', expiryDate: isoDay(300), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 3, nurseId: 3, credentialType: 'Certification', name: 'BLS', issuingAuthority: 'American Heart Association', credentialNumber: 'BLS-44520', issuedDate: isoDay(-340), expiryDate: isoDay(20), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 4, nurseId: 3, credentialType: 'License', name: 'LPN_LICENSE', issuingAuthority: 'SCFHS', credentialNumber: 'LPN-55201', issuedDate: '2021-09-15', expiryDate: isoDay(500), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 5, nurseId: 4, credentialType: 'Certification', name: 'CNA_CERT', issuingAuthority: 'TVTC', credentialNumber: 'CNA-77812', issuedDate: '2022-01-05', expiryDate: isoDay(200), status: 'Valid', verifiedBy: null, verifiedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 6, nurseId: 1, credentialType: 'Certification', name: 'ACLS', issuingAuthority: 'American Heart Association', credentialNumber: 'ACLS-99871', issuedDate: isoDay(-180), expiryDate: isoDay(185), status: 'PendingVerification', verifiedBy: null, verifiedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 1, nurseId: 1, credentialType: 'License', name: 'RN_LICENSE', issuingAuthority: 'SCFHS', credentialNumber: 'RN-88231', templateCode: 'SCFHS', trackingData: { professionalClassification: 'Specialist Nursing' }, issuedDate: '2023-01-15', expiryDate: isoDay(400), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 2, nurseId: 2, credentialType: 'License', name: 'RN_LICENSE', issuingAuthority: 'SCFHS', credentialNumber: 'RN-90417', templateCode: 'SCFHS', trackingData: { professionalClassification: 'Registered Nurse' }, issuedDate: '2022-06-01', expiryDate: isoDay(300), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 3, nurseId: 3, credentialType: 'Certification', name: 'BLS', issuingAuthority: 'American Heart Association', credentialNumber: 'BLS-44520', templateCode: 'BLS', trackingData: {}, issuedDate: isoDay(-340), expiryDate: isoDay(20), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 4, nurseId: 3, credentialType: 'License', name: 'LPN_LICENSE', issuingAuthority: 'SCFHS', credentialNumber: 'LPN-55201', templateCode: 'PROFESSIONAL_LICENSE', trackingData: { issuingCountry: 'United States', psvStatus: 'Verified' }, issuedDate: '2021-09-15', expiryDate: isoDay(500), status: 'Valid', verifiedBy: 9, verifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 5, nurseId: 4, credentialType: 'Certification', name: 'CNA_CERT', issuingAuthority: 'TVTC', credentialNumber: 'CNA-77812', templateCode: null, trackingData: {}, issuedDate: '2022-01-05', expiryDate: isoDay(200), status: 'Valid', verifiedBy: null, verifiedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 6, nurseId: 1, credentialType: 'Certification', name: 'ACLS', issuingAuthority: 'American Heart Association', credentialNumber: 'ACLS-99871', templateCode: 'ACLS', trackingData: {}, issuedDate: isoDay(-180), expiryDate: isoDay(185), status: 'PendingVerification', verifiedBy: null, verifiedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 const mockRoster = [
@@ -1439,8 +1501,11 @@ function mockDaysUntil(expiryDate) {
   return Math.round((Date.parse(expiryDate) - Date.parse(today)) / dayMs);
 }
 function mapMockCredential(c) {
+  const tpl = c.templateCode ? mockCredentialTemplates.find((t) => t.code === c.templateCode) : null;
   return {
-    id: c.id, nurseId: c.nurseId, credentialType: c.credentialType, name: c.name,
+    id: c.id, nurseId: c.nurseId, templateCode: c.templateCode || null, trackingData: c.trackingData || {},
+    category: tpl ? tpl.category : null,
+    credentialType: c.credentialType, name: c.name,
     issuingAuthority: c.issuingAuthority, credentialNumber: c.credentialNumber,
     issuedDate: c.issuedDate, expiryDate: c.expiryDate,
     daysUntilExpiry: mockDaysUntil(c.expiryDate),
@@ -1508,7 +1573,7 @@ function mapMockRoster(a) {
 app.get('/api/v1/nursing/lookups', (req, res) => {
   res.json({
     success: true,
-    data: { positions: mockPositions, departments: mockDepartments, roles: mockNurseRoles, units: mockUnits, shifts: mockShifts, posts: mockPosts, countries: COUNTRIES },
+    data: { positions: mockPositions, departments: mockDepartments, roles: mockNurseRoles, units: mockUnits, shifts: mockShifts, posts: mockPosts, credentialTemplates: mockCredentialTemplates, countries: COUNTRIES },
     timestamp: new Date().toISOString(),
   });
 });
@@ -1706,7 +1771,7 @@ app.get('/api/v1/nursing/credentials/expiring', (req, res) => {
       const nurse = mockNurses.find((n) => n.id === c.nurseId);
       return {
         ...mapMockCredential(c),
-        nurse: nurse ? { id: nurse.id, employeeNumber: nurse.employeeNumber, fullName: nurse.firstName + ' ' + nurse.lastName } : null,
+        nurse: nurse ? { id: nurse.id, employeeNumber: nurse.employeeNumber, fullName: [nurse.firstName, nurse.middleName, nurse.lastName].filter(Boolean).join(' ') } : null,
       };
     });
   res.json({ success: true, data: { days, items }, timestamp: new Date().toISOString() });
@@ -1721,6 +1786,34 @@ app.post('/api/v1/nursing/credentials', (req, res) => {
   if (!nurse) {
     return res.status(404).json({ success: false, message: 'Nurse #' + b.nurse_id + ' not found', timestamp: new Date().toISOString() });
   }
+  // Template + payload validation mirrors Nest validateCredential() (runs before the duplicate check)
+  const tpl = b.template_code ? mockCredentialTemplates.find((t) => t.code === b.template_code) : null;
+  if (b.template_code && !tpl) {
+    return res.status(400).json({ success: false, message: 'Unknown credential template', timestamp: new Date().toISOString() });
+  }
+  if (tpl && (tpl.name !== b.name || tpl.credentialType !== b.credential_type)) {
+    return res.status(400).json({ success: false, message: 'Credential name and type must match the selected template', timestamp: new Date().toISOString() });
+  }
+  const validDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
+  for (const k of ['issued_date', 'expiry_date']) {
+    if (b[k] != null && b[k] !== '' && !validDay(String(b[k]).slice(0, 10))) {
+      return res.status(400).json({ success: false, message: k + ' must be a valid date', timestamp: new Date().toISOString() });
+    }
+  }
+  if (b.issued_date && b.expiry_date && String(b.expiry_date).slice(0, 10) < String(b.issued_date).slice(0, 10)) {
+    return res.status(400).json({ success: false, message: 'Expiry/reassessment date cannot precede issue/assessment date', timestamp: new Date().toISOString() });
+  }
+  if (b.tracking_data !== undefined && (typeof b.tracking_data !== 'object' || b.tracking_data === null || Array.isArray(b.tracking_data))) {
+    return res.status(400).json({ success: false, message: 'Invalid tracking data', timestamp: new Date().toISOString() });
+  }
+  if (b.tracking_data) {
+    const allowed = tpl ? tpl.fields.map((f) => f.key) : [];
+    for (const key of Object.keys(b.tracking_data)) {
+      if (!allowed.includes(key)) {
+        return res.status(400).json({ success: false, message: 'Unsupported tracking field: ' + key, timestamp: new Date().toISOString() });
+      }
+    }
+  }
   if (mockCredentials.some((c) => c.nurseId === b.nurse_id && c.credentialType === b.credential_type && c.name === b.name)) {
     return res.status(409).json({ success: false, message: 'Nurse already has a ' + b.credential_type + ' named "' + b.name + '"', timestamp: new Date().toISOString() });
   }
@@ -1733,6 +1826,8 @@ app.post('/api/v1/nursing/credentials', (req, res) => {
     credentialNumber: b.credential_number || null,
     issuedDate: b.issued_date ? String(b.issued_date).slice(0, 10) : null,
     expiryDate: b.expiry_date ? String(b.expiry_date).slice(0, 10) : null,
+    templateCode: b.template_code || null,
+    trackingData: b.tracking_data || {},
     status: 'PendingVerification',
     verifiedBy: null,
     verifiedAt: null,
@@ -1753,9 +1848,21 @@ app.patch('/api/v1/nursing/credentials/:id', (req, res) => {
   if (b.name !== undefined) cred.name = b.name;
   if (b.issuing_authority !== undefined) cred.issuingAuthority = b.issuing_authority;
   if (b.credential_number !== undefined) cred.credentialNumber = b.credential_number;
-  if (b.issued_date !== undefined) cred.issuedDate = String(b.issued_date).slice(0, 10);
-  if (b.expiry_date !== undefined) cred.expiryDate = String(b.expiry_date).slice(0, 10);
-  if (b.status !== undefined) cred.status = b.status;
+  if (b.template_code !== undefined && (b.template_code || null) !== (cred.templateCode || null)) {
+    return res.status(400).json({ success: false, message: 'The credential template cannot be changed; add a separate credential instead', timestamp: new Date().toISOString() });
+  }
+  const nextIssued = b.issued_date !== undefined ? b.issued_date : cred.issuedDate;
+  const nextExpiry = b.expiry_date !== undefined ? b.expiry_date : cred.expiryDate;
+  if (nextIssued && nextExpiry && String(nextExpiry).slice(0, 10) < String(nextIssued).slice(0, 10)) {
+    return res.status(400).json({ success: false, message: 'Expiry/reassessment date cannot precede issue/assessment date', timestamp: new Date().toISOString() });
+  }
+  if (b.issued_date !== undefined) cred.issuedDate = b.issued_date ? String(b.issued_date).slice(0, 10) : null;
+  if (b.expiry_date !== undefined) cred.expiryDate = b.expiry_date ? String(b.expiry_date).slice(0, 10) : null;
+  if (b.tracking_data !== undefined) cred.trackingData = b.tracking_data || {};
+  // Any edit resets verification (mirrors Nest updateCredential)
+  cred.status = 'PendingVerification';
+  cred.verifiedBy = null;
+  cred.verifiedAt = null;
   cred.updatedAt = new Date().toISOString();
   res.json({ success: true, data: { credential: mapMockCredential(cred) }, timestamp: new Date().toISOString() });
 });
@@ -1765,11 +1872,124 @@ app.post('/api/v1/nursing/credentials/:id/verify', (req, res) => {
   if (!cred) {
     return res.status(404).json({ success: false, message: 'Credential #' + req.params.id + ' not found', timestamp: new Date().toISOString() });
   }
-  cred.status = (req.body && req.body.status) || 'Valid';
-  cred.verifiedBy = 1;
+  const status = (req.body && req.body.status) || 'Valid';
+  if (status === 'Valid' && cred.expiryDate && cred.expiryDate < isoDay(0)) {
+    return res.status(400).json({ success: false, message: 'Expired credentials cannot be verified as Valid', timestamp: new Date().toISOString() });
+  }
+  cred.status = status;
+  cred.verifiedBy = mockUserIdFromAuth(req) || 1;
   cred.verifiedAt = new Date().toISOString();
   cred.updatedAt = new Date().toISOString();
   res.json({ success: true, data: { credential: mapMockCredential(cred) }, timestamp: new Date().toISOString() });
+});
+
+// ---- credential document store (in-memory; mirrors nursing.credential_documents) ----
+const mockCredentialDocuments = {}; // credentialId -> { fileName, mediaType, size, content: Buffer, uploadedAt }
+
+function mockUserIdFromAuth(req) {
+  const m = String(req.headers.authorization || '').match(/mock_jwt_(\d+)_/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Minimal single-file multipart parser (no new deps) for the document upload.
+// express.json() skips non-JSON bodies without consuming the stream, so the raw
+// bytes are still available here.
+function readMockRawBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      const buf = Buffer.concat(chunks);
+      if (buf.length > maxBytes) reject(new Error('too large'));
+      else resolve(buf);
+    });
+    req.on('error', reject);
+  });
+}
+
+function parseMockMultipartBuffer(buf, boundary) {
+  const parts = [];
+  for (const sec of buf.toString('binary').split('--' + boundary)) {
+    if (!sec.includes('Content-Disposition')) continue;
+    const headerEnd = sec.indexOf('\r\n\r\n');
+    if (headerEnd === -1) continue;
+    const headers = sec.slice(0, headerEnd);
+    let body = sec.slice(headerEnd + 4);
+    if (body.endsWith('\r\n')) body = body.slice(0, -2);
+    parts.push({
+      field: ((headers.match(/name="([^"]*)"/) || [])[1] || '').trim(),
+      filename: (headers.match(/filename="([^"]*)"/) || [])[1] || '',
+      mimetype: ((headers.match(/Content-Type:\s*([^\r\n;]+)/i) || [])[1] || 'application/octet-stream').trim().toLowerCase(),
+      data: Buffer.from(body, 'binary'),
+    });
+  }
+  return parts;
+}
+
+app.post('/api/v1/nursing/credentials/:id/document', async (req, res) => {
+  const fail = (message) => res.status(400).json({ success: false, message, timestamp: new Date().toISOString() });
+  const cred = mockCredentials.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cred) {
+    return res.status(404).json({ success: false, message: 'Credential #' + req.params.id + ' not found', timestamp: new Date().toISOString() });
+  }
+  const bm = String(req.headers['content-type'] || '').match(/boundary=([^;]+)/);
+  if (!bm) return fail('Upload a PDF, JPEG, or PNG file up to 5 MB');
+  let buf;
+  try {
+    buf = await readMockRawBody(req, 6 * 1024 * 1024);
+  } catch {
+    return fail('Upload a PDF, JPEG, or PNG file up to 5 MB');
+  }
+  const file = parseMockMultipartBuffer(buf, bm[1].replace(/"/g, '')).find((x) => x.field === 'file' && x.filename);
+  if (!file || !file.data.length || file.data.length > 5 * 1024 * 1024) return fail('Upload a PDF, JPEG, or PNG file up to 5 MB');
+  // Magic-byte check mirrors Nest uploadCredentialDocument (content must match claim)
+  const b = file.data;
+  const mediaType = b.length >= 5 && b.subarray(0, 5).toString() === '%PDF-' ? 'application/pdf'
+    : b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? 'image/png'
+    : b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255 ? 'image/jpeg' : null;
+  if (!mediaType || mediaType !== file.mimetype) return fail('Only PDF, JPEG, and PNG documents are accepted');
+  const fileName = (Array.from(file.filename, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 32 || code === 127 || ch === '/' || ch === '\\' ? '_' : ch;
+  }).join('').slice(0, 255) || 'document');
+  mockCredentialDocuments[cred.id] = { fileName, mediaType, size: b.length, content: b, uploadedAt: new Date().toISOString() };
+  // Upload resets verification (mirrors Nest: storage + reset are atomic)
+  cred.status = 'PendingVerification';
+  cred.verifiedBy = null;
+  cred.verifiedAt = null;
+  cred.updatedAt = new Date().toISOString();
+  res.json({ success: true, data: { fileName, mediaType, size: b.length }, timestamp: new Date().toISOString() });
+});
+
+app.get('/api/v1/nursing/credentials/:id/document', (req, res) => {
+  const cred = mockCredentials.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cred) {
+    return res.status(404).json({ success: false, message: 'Credential #' + req.params.id + ' not found', timestamp: new Date().toISOString() });
+  }
+  const doc = mockCredentialDocuments[cred.id] || null;
+  res.json({
+    success: true,
+    data: doc ? { fileName: doc.fileName, mediaType: doc.mediaType, size: doc.size, uploadedAt: doc.uploadedAt } : null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/v1/nursing/credentials/:id/document/download', (req, res) => {
+  const cred = mockCredentials.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cred) {
+    return res.status(404).json({ success: false, message: 'Credential #' + req.params.id + ' not found', timestamp: new Date().toISOString() });
+  }
+  const doc = mockCredentialDocuments[cred.id];
+  if (!doc) {
+    return res.status(404).json({ success: false, message: 'No document has been uploaded', timestamp: new Date().toISOString() });
+  }
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Type', doc.mediaType);
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.fileName)}`);
+  res.setHeader('Content-Length', doc.size);
+  res.send(doc.content);
 });
 
 app.get('/api/v1/nursing/roster', (req, res) => {
