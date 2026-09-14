@@ -208,8 +208,25 @@ export class ContractsService {
 
   async listPositions() {
     const rows = await this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT id, code, name, category, status FROM nursing.positions
-       WHERE status = 'Active' ORDER BY code`,
+      `SELECT p.id, p.code, p.name, p.category, p.status,
+              parent.code AS parent_code,
+              COALESCE(h.level, 0)::int AS hierarchy_level
+       FROM nursing.positions p
+       LEFT JOIN nursing.positions parent ON parent.id = p.parent_position_id
+       LEFT JOIN LATERAL (
+         WITH RECURSIVE ancestors(id, level) AS (
+           SELECT p.parent_position_id, 1
+           WHERE p.parent_position_id IS NOT NULL
+           UNION ALL
+           SELECT parent.parent_position_id, ancestors.level + 1
+           FROM nursing.positions parent
+           JOIN ancestors ON ancestors.id = parent.id
+           WHERE ancestors.id IS NOT NULL
+         )
+         SELECT MAX(level) AS level FROM ancestors
+       ) h ON TRUE
+       WHERE p.status = 'Active'
+       ORDER BY p.code`,
     );
     return rows.map((p) => ({
       id: Number(p.id),
@@ -217,7 +234,33 @@ export class ContractsService {
       name: p.name,
       category: p.category,
       status: p.status,
+      parentCode: p.parent_code ?? null,
+      hierarchyLevel: Number(p.hierarchy_level ?? 0),
     }));
+  }
+
+  async listPositionHierarchy() {
+    const positions = await this.listPositions();
+    const byCode = new Map(positions.map((position) => [
+      position.code,
+      { ...position, children: [] as any[] },
+    ]));
+    const roots: any[] = [];
+
+    for (const position of byCode.values()) {
+      if (position.parentCode && byCode.has(position.parentCode)) {
+        byCode.get(position.parentCode).children.push(position);
+      } else {
+        roots.push(position);
+      }
+    }
+
+    const sort = (items: any[]) => {
+      items.sort((a, b) => a.code.localeCompare(b.code));
+      items.forEach((item) => sort(item.children));
+    };
+    sort(roots);
+    return roots;
   }
 
   async listExpiring(days = 90) {

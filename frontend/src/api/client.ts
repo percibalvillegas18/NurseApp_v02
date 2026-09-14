@@ -179,3 +179,7 @@ export const nursingApi = {
     apiClient.patch(`/nursing/roster/${id}`, data),
   deleteAssignment: (id: number) => apiClient.delete(`/nursing/roster/${id}`),
 };
+
+export const contractsApi = {
+  getPositionHierarchy: () => apiClient.get('/contracts/positions/hierarchy'),
+};

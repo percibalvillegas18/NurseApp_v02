@@ -50,7 +50,7 @@ Nurse-App_v01/
 │   │       ├── nursing/     # nurses, credentials, roster (+ data scopes)
 │   │       └── contracts/   # Contract Master lifecycle
 │   ├── prisma/schema.prisma · seed.ts
-│   ├── database/migrations/   # V1_0 … V4_3 (see below)
+│   ├── database/migrations/   # V1_0 … V4_10 (see below)
 │   ├── scripts/
 │   │   ├── run-migrations.ts
 │   │   └── run-contract-expiry-alerts.ts
@@ -87,6 +87,7 @@ npx ts-node scripts/run-migrations.ts
 | **V4_1** | Contract expiry alerts |
 | **V4_2** | Active-contract exclusivity (GiST / `btree_gist`, `active_span`) |
 | **V4_3** | Staff credential tracking (templates, position linkage) |
+| **V4_10** | Position hierarchy (parent links, cycle protection, hierarchy API) |
 
 History is recorded in `public.schema_migrations`.
 
@@ -113,7 +114,7 @@ cp .env.example .env.development   # set DATABASE_URL, JWT, Redis
 docker-compose up -d postgres redis
 
 export DATABASE_URL=postgresql://devuser:devpassword@localhost:5432/hospital_rbac_dev
-npm run db:migrate:raw             # runs V1_0 … V4_3
+npm run db:migrate:raw             # runs V1_0 … V4_10
 npx prisma generate
 npm run prisma:seed
 
@@ -201,6 +202,7 @@ Aggregates **all** active roles (not only `primary_role_id`), `BOOL_OR` on menu 
 - ✅ **V4_2 exclusivity** — GiST active span; transactional activate/approve
 - ✅ **V4_1 expiry alerts** — scan script + docs
 - ✅ **V4_3 staff credential tracking**
+- ✅ **V4_10 position hierarchy** — explicit employment-position parent links; authorization roles remain separate
 - ✅ **V3_5 / V3_6** tamper-proof audit + partitioning helpers
 - ✅ **Data scopes** on nurse and roster (#6)
 - ✅ User management (CRUD, roles, unlock, password reset, sessions, audit)

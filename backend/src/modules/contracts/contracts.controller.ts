@@ -51,6 +51,13 @@ export class ContractsController {
     return { success: true, data, timestamp: new Date().toISOString() };
   }
 
+  @Get('positions/hierarchy')
+  @CanView('CONTRACT')
+  async positionHierarchy() {
+    const data = await this.contracts.listPositionHierarchy();
+    return { success: true, data, timestamp: new Date().toISOString() };
+  }
+
   @Get('expiring')
   @CanView('CONTRACT')
   async expiring(@Query('days') days?: string) {

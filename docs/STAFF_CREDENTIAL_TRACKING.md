@@ -2,7 +2,12 @@
 
 Nurse Master now records the nine supplied position codes (HN, AHN, CI, SN,
 PCT, TEC, CN, HCA, MW). Position is an employment attribute and does not assign
-an authorization role. The existing Primary Role field remains separate.
+an authorization role. The existing Primary Role field remains separate. V4_10 adds an explicit
+employment-position hierarchy to the same catalog: HN is the root, AHN/CI/CN/MW
+report to HN, and SN/PCT/TEC/HCA report to CN. This is descriptive employment
+metadata only; it does not grant authorization or replace RBAC roles. The
+hierarchy is available from `GET /api/v1/contracts/positions/hierarchy`, while
+the existing flat positions endpoint remains backward-compatible.
 
 Select a department before selecting its nursing unit. Changing department
 clears the previous unit selection. The migration adds the four supplied

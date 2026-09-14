@@ -599,6 +599,7 @@ model nursing_positions {
   code            String   @unique @db.VarChar(50)
   name            String   @db.VarChar(255)
   description     String?  @db.Text
+  parent_position_id BigInt?
   department_id   BigInt?
   nursing_unit_id BigInt?
   category        String?  @db.VarChar(100)
@@ -606,9 +607,12 @@ model nursing_positions {
   created_at      DateTime @default(now()) @db.Timestamp()
   updated_at      DateTime @default(now()) @updatedAt @db.Timestamp()
 
+  parent          nursing_positions?  @relation("PositionHierarchy", fields: [parent_position_id], references: [id], onDelete: Restrict)
+  children        nursing_positions[] @relation("PositionHierarchy")
   contracts       nursing_employment_contracts[]
 
   @@index([status])
+  @@index([parent_position_id])
   @@index([nursing_unit_id])
   @@map("positions")
   @@schema("nursing")

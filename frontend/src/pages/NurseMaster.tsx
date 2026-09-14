@@ -453,7 +453,12 @@ export const NurseMaster: React.FC = () => {
           </Row>
 
           <Form.Item name="positionCode" label="Position" rules={[{ required: true, message: 'Select a position' }]}>
-            <Select showSearch optionFilterProp="label" options={(lookups?.positions ?? []).map(p => ({ value: p.code, label: p.code + ' (' + p.name + ')' }))} />
+            <Select showSearch optionFilterProp="label" options={[...(lookups?.positions ?? [])].sort((a, b) =>
+              (a.hierarchyLevel ?? 0) - (b.hierarchyLevel ?? 0) || a.code.localeCompare(b.code),
+            ).map(p => ({
+              value: p.code,
+              label: `${'— '.repeat(p.hierarchyLevel ?? 0)}${p.code} (${p.name})`,
+            }))} />
           </Form.Item>
           <Form.Item name="departmentId" label="Department" rules={[{ required: true, message: 'Select a department' }]}>
             <Select showSearch optionFilterProp="label" onChange={() => form.setFieldValue('homeUnitId', undefined)} options={(lookups?.departments ?? []).map(d => ({ value: d.id, label: d.name }))} />

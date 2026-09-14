@@ -1,14 +1,14 @@
 /** Staff positions describe employment, independently of authorization roles. */
 export const STAFF_POSITIONS = [
-  { code: 'HN', name: 'Head Nurse' },
-  { code: 'AHN', name: 'Asst. Head Nurse' },
-  { code: 'CI', name: 'Clinical Instructor' },
-  { code: 'SN', name: 'Staff Nurse' },
-  { code: 'PCT', name: 'Patient Care Tech' },
-  { code: 'TEC', name: 'ECG Technician' },
-  { code: 'CN', name: 'Charge Nurse' },
-  { code: 'HCA', name: 'Health Care Asst.' },
-  { code: 'MW', name: 'Midwife' },
+  { code: 'HN', name: 'Head Nurse', parentCode: null, hierarchyLevel: 0 },
+  { code: 'AHN', name: 'Asst. Head Nurse', parentCode: 'HN', hierarchyLevel: 1 },
+  { code: 'CI', name: 'Clinical Instructor', parentCode: 'HN', hierarchyLevel: 1 },
+  { code: 'SN', name: 'Staff Nurse', parentCode: 'CN', hierarchyLevel: 2 },
+  { code: 'PCT', name: 'Patient Care Tech', parentCode: 'CN', hierarchyLevel: 2 },
+  { code: 'TEC', name: 'ECG Technician', parentCode: 'CN', hierarchyLevel: 2 },
+  { code: 'CN', name: 'Charge Nurse', parentCode: 'HN', hierarchyLevel: 1 },
+  { code: 'HCA', name: 'Health Care Asst.', parentCode: 'CN', hierarchyLevel: 2 },
+  { code: 'MW', name: 'Midwife', parentCode: 'HN', hierarchyLevel: 1 },
 ];
 
 export interface CredentialField {

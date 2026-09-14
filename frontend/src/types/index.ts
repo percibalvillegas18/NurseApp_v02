@@ -281,7 +281,7 @@ export interface CredentialTemplate {
   fields: Array<{ key: string; label: string; type: 'text' | 'date' | 'number' | 'select' | 'unit'; options?: string[] }>;
 }
 export interface NursingLookups {
-  positions: Array<{ code: string; name: string }>;
+  positions: Array<{ code: string; name: string; parentCode?: string | null; hierarchyLevel?: number }>;
   departments: Array<{ id: number; code: string; name: string }>;
   credentialTemplates: CredentialTemplate[];
   roles: Array<{ id: number; code: string; name: string; category: string }>;
@@ -290,6 +290,17 @@ export interface NursingLookups {
   posts: Array<{ id: number; code: string; name: string; nursing_unit_id: number }>;
   /** Country display names for the Nationality selector */
   countries: string[];
+}
+
+export interface PositionHierarchyNode {
+  id: number;
+  code: string;
+  name: string;
+  category: string | null;
+  status: string;
+  parentCode: string | null;
+  hierarchyLevel: number;
+  children: PositionHierarchyNode[];
 }
 
 export interface NurseListParams {
