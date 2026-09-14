@@ -301,8 +301,12 @@ module.exports = function registerWorkforceRoutes(app, deps) {
     if (opts.requireNote && !(req.body || {}).note) {
       return res.status(400).json({ success: false, message: 'A decision note is required', timestamp: new Date().toISOString() });
     }
-    // Re-validate on approve: overlap + balance may have changed since submit
-    if (to === 'Approved') {
+    // Re-validate on submit AND approve: overlap + balance may have changed
+    // since the draft was created (drafts hold dates but not balance).
+    // NOTE (fix 2026-09): submit previously skipped validation entirely, and the
+    // old approve check `r.days > remaining + r.days` could never fire because
+    // `remaining` is clamped at 0 — 40 days were approvable against 30 entitled.
+    if (to === 'Submitted' || to === 'Approved') {
       const clash = leaveOverlap(r.nurseId, r.startDate, r.endDate, r.id);
       if (clash) {
         return res.status(409).json({ success: false, message: `Overlaps ${clash.status} request #${clash.id} (${clash.startDate} → ${clash.endDate})`, timestamp: new Date().toISOString() });
@@ -310,9 +314,16 @@ module.exports = function registerWorkforceRoutes(app, deps) {
       const type = mockLeaveTypes.find((t) => t.code === r.leaveTypeCode);
       if (type && type.paid) {
         const bal = leaveBalances(r.nurseId).find((x) => x.leaveTypeCode === type.code);
-        // pending includes this request, so available = remaining + this request's days
-        if (r.days > bal.remaining + r.days) {
-          return res.status(409).json({ success: false, message: `Insufficient ${type.name} balance`, timestamp: new Date().toISOString() });
+        if (to === 'Submitted') {
+          // Draft holds no balance yet: same rule as create-time.
+          if (r.days > bal.remaining) {
+            return res.status(409).json({ success: false, message: `Insufficient ${type.name} balance: needs ${r.days} day(s), only ${bal.remaining} remaining (entitled ${bal.entitled}, used ${bal.used}, pending ${bal.pending})`, timestamp: new Date().toISOString() });
+          }
+        } else if (bal.used + bal.pending > bal.entitled) {
+          // Request is inside `pending`: approving only moves days pending→used,
+          // so reject only if concurrent approvals already broke the invariant.
+          // (Unclamped comparison — `remaining` is clamped at 0 and can't show it.)
+          return res.status(409).json({ success: false, message: `Insufficient ${type.name} balance: approved+pending ${bal.used + bal.pending} day(s) exceed entitlement ${bal.entitled}`, timestamp: new Date().toISOString() });
         }
       }
     }
