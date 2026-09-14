@@ -194,6 +194,24 @@ function requireMockAuth(req, res, next) {
   req.mockUserId = issuedAccessTokens.get(token);
   next();
 }
+
+// Mock RBAC permission check - mirrors backend's EffectiveAccessService
+function checkMockPermission(req, res, next) {
+  const user = Object.values(mockUsers).find(u => u.id === req.mockUserId);
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'User not found',
+      timestamp: new Date().toISOString(),
+    });
+  }
+  // For simplicity, we'll add a permission check based on role
+  // In a real mock, this would query the mock RBAC matrix
+  // For now, we'll just attach the user and let the endpoint handle it
+  req.mockUser = user;
+  next();
+}
 for (const protectedPath of [
   '/api/v1/users',
   '/api/v1/nursing',
@@ -1094,7 +1112,7 @@ app.get('/api/v1/rbac/effective-access/:userId', (req, res) => {
   });
 });
 
-app.post('/api/v1/rbac/effective-access/:userId/evaluate', (req, res) => {
+app.post('/api/v1/rbac/effective-access/:userId/evaluate', requireMockAuth, checkMockPermission, (req, res) => {
   const { menuCode, permissionCode, resourceId } = req.body;
   const userId = parseInt(req.params.userId, 10);
   const user = Object.values(mockUsers).find(u => u.id === userId) || lastLoggedInUser;
@@ -1164,7 +1182,7 @@ app.post('/api/v1/rbac/effective-access/:userId/evaluate', (req, res) => {
   });
 });
 
-app.post('/api/v1/rbac/effective-access/:userId/preview', (req, res) => {
+app.post('/api/v1/rbac/effective-access/:userId/preview', requireMockAuth, checkMockPermission, (req, res) => {
   res.json({
     success: true,
     data: {
