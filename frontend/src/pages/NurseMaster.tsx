@@ -185,7 +185,10 @@ export const NurseMaster: React.FC = () => {
       width: 128,
       render: (jobNo: string, nurse: Nurse) => (
         <Space direction="vertical" size={0}>
-          <Text strong>{jobNo ?? '—'}</Text>
+          <Space size={4}>
+            <Text strong>{jobNo ?? '—'}</Text>
+            {nurse.isDemo && <Tag color="orange">TEMP</Tag>}
+          </Space>
           <Text type="secondary" style={{ fontSize: 11 }}>{nurse.employeeNumber}</Text>
         </Space>
       ),

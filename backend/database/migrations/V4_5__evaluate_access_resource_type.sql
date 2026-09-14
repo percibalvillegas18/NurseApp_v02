@@ -90,7 +90,7 @@ BEGIN
   -- Menu access (any active role with visible+enabled)
   SELECT m.id, m.status
     INTO v_menu_id, v_menu_status
-  FROM system.menus m
+  FROM rbac.menus m
   WHERE m.code = p_menu_code;
 
   IF NOT FOUND OR v_menu_status IS DISTINCT FROM 'Active' THEN
@@ -100,14 +100,16 @@ BEGIN
     RETURN;
   END IF;
 
+  -- NOTE (repair 2026-09): join on hr.code = rma.role_code (role_id was the
+  -- legacy V1 column, dropped in V2_2); visibility columns are visible/enabled.
   SELECT EXISTS (
     SELECT 1
     FROM rbac.role_menu_access rma
-    JOIN system.hospital_roles hr ON hr.id = rma.role_id
+    JOIN system.hospital_roles hr ON hr.code = rma.role_code
     WHERE rma.menu_id = v_menu_id
       AND rma.status = 'Active'
-      AND rma.is_visible = TRUE
-      AND rma.is_enabled = TRUE
+      AND rma.visible = TRUE
+      AND rma.enabled = TRUE
       AND (rma.effective_from IS NULL OR rma.effective_from <= v_now)
       AND (rma.effective_to IS NULL OR rma.effective_to >= v_now)
       AND hr.code = ANY(v_all_role_codes)
@@ -127,7 +129,7 @@ BEGIN
   -- Permission
   SELECT p.id, p.status
     INTO v_perm_id, v_perm_status
-  FROM system.permissions p
+  FROM rbac.permissions p
   WHERE p.code = p_permission_code;
 
   IF NOT FOUND OR v_perm_status IS DISTINCT FROM 'Active' THEN
@@ -137,14 +139,15 @@ BEGIN
     RETURN;
   END IF;
 
+  -- NOTE (repair 2026-09): join on hr.code = rp.role_code; grant column is allowed.
   SELECT EXISTS (
     SELECT 1
     FROM rbac.role_permissions rp
-    JOIN system.hospital_roles hr ON hr.id = rp.role_id
+    JOIN system.hospital_roles hr ON hr.code = rp.role_code
     WHERE rp.permission_id = v_perm_id
       AND rp.menu_id = v_menu_id
       AND rp.status = 'Active'
-      AND rp.is_allowed = TRUE
+      AND rp.allowed = TRUE
       AND (rp.effective_from IS NULL OR rp.effective_from <= v_now)
       AND (rp.effective_to IS NULL OR rp.effective_to >= v_now)
       AND hr.code = ANY(v_all_role_codes)
@@ -179,47 +182,46 @@ BEGIN
     -- No specific resource: any active scope (or All) is enough
     v_scope_valid := v_has_all_scope OR v_scope_count > 0;
   ELSE
-    -- Resolve resource → unit / dept / org using explicit type when provided
+    -- Resolve resource → unit, then unit → dept / org (repair 2026-09: units live
+    -- in rbac.nursing_units, which has no organization_id — org comes via
+    -- rbac.departments. Same two-step pattern as V4_4).
     IF p_resource_type = 'unit' THEN
-      SELECT u.id, u.department_id, u.organization_id
-        INTO v_resource_unit_id, v_resource_dept_id, v_resource_org_id
-      FROM nursing.nursing_units u
-      WHERE u.id = p_resource_id;
+      SELECT nu.id INTO v_resource_unit_id
+      FROM rbac.nursing_units nu
+      WHERE nu.id = p_resource_id;
     ELSIF p_resource_type = 'nurse' THEN
-      SELECT n.home_unit_id, u.department_id, u.organization_id
-        INTO v_resource_unit_id, v_resource_dept_id, v_resource_org_id
+      SELECT n.home_unit_id INTO v_resource_unit_id
       FROM nursing.nurses n
-      JOIN nursing.nursing_units u ON u.id = n.home_unit_id
-      WHERE n.id = p_resource_id;
+      WHERE n.id = p_resource_id AND n.deleted_at IS NULL;
     ELSIF p_resource_type = 'credential' THEN
-      SELECT n.home_unit_id, u.department_id, u.organization_id
-        INTO v_resource_unit_id, v_resource_dept_id, v_resource_org_id
+      SELECT n.home_unit_id INTO v_resource_unit_id
       FROM nursing.credentials c
-      JOIN nursing.nurses n ON n.id = c.nurse_id
-      JOIN nursing.nursing_units u ON u.id = n.home_unit_id
-      WHERE c.id = p_resource_id;
+      JOIN nursing.nurses n ON n.id = c.nurse_id AND n.deleted_at IS NULL
+      WHERE c.id = p_resource_id AND c.deleted_at IS NULL;
     ELSIF p_resource_type = 'contract' THEN
-      SELECT n.home_unit_id, u.department_id, u.organization_id
-        INTO v_resource_unit_id, v_resource_dept_id, v_resource_org_id
+      SELECT n.home_unit_id INTO v_resource_unit_id
       FROM nursing.employment_contracts ec
-      JOIN nursing.nurses n ON n.id = ec.nurse_id
-      JOIN nursing.nursing_units u ON u.id = n.home_unit_id
+      JOIN nursing.nurses n ON n.id = ec.nurse_id AND n.deleted_at IS NULL
       WHERE ec.id = p_resource_id;
     ELSIF p_resource_type IS NULL THEN
       -- Backward-compatible heuristic (V4_4 behaviour)
-      SELECT n.home_unit_id, u.department_id, u.organization_id
-        INTO v_resource_unit_id, v_resource_dept_id, v_resource_org_id
+      SELECT n.home_unit_id INTO v_resource_unit_id
       FROM nursing.nurses n
-      JOIN nursing.nursing_units u ON u.id = n.home_unit_id
-      WHERE n.id = p_resource_id;
+      WHERE n.id = p_resource_id AND n.deleted_at IS NULL;
 
       IF v_resource_unit_id IS NULL THEN
-        SELECT ra.nursing_unit_id, u.department_id, u.organization_id
-          INTO v_resource_unit_id, v_resource_dept_id, v_resource_org_id
+        SELECT ra.nursing_unit_id INTO v_resource_unit_id
         FROM nursing.roster_assignments ra
-        JOIN nursing.nursing_units u ON u.id = ra.nursing_unit_id
         WHERE ra.id = p_resource_id;
       END IF;
+    END IF;
+
+    IF v_resource_unit_id IS NOT NULL THEN
+      SELECT nu.department_id, d.organization_id
+        INTO v_resource_dept_id, v_resource_org_id
+      FROM rbac.nursing_units nu
+      LEFT JOIN rbac.departments d ON d.id = nu.department_id
+      WHERE nu.id = v_resource_unit_id;
     END IF;
 
     IF v_has_all_scope THEN
@@ -230,11 +232,18 @@ BEGIN
         FROM rbac.user_data_scopes uds
         WHERE uds.user_id = p_user_id
           AND uds.status = 'Active'
+          -- NOTE (repair 2026-09): real scope_type values are Hospital (not
+          -- Organization) and NursingUnit (not Unit); unit column is nursing_unit_id.
           AND (
-            (uds.scope_type = 'Organization' AND uds.organization_id = v_resource_org_id)
-            OR (uds.scope_type = 'Department'   AND uds.department_id   = v_resource_dept_id)
-            OR (uds.scope_type = 'Unit'         AND uds.unit_id         = v_resource_unit_id)
-            OR (uds.scope_type = 'Assigned'     AND EXISTS (
+            (uds.scope_type = 'Hospital' AND uds.organization_id = v_resource_org_id)
+            OR (uds.scope_type = 'Department' AND uds.department_id = v_resource_dept_id)
+            OR (uds.scope_type = 'NursingUnit' AND uds.nursing_unit_id = v_resource_unit_id)
+            OR (uds.scope_type = 'Post' AND uds.post_id IS NOT NULL
+                AND EXISTS (
+                  SELECT 1 FROM rbac.posts p
+                  WHERE p.id = uds.post_id AND p.nursing_unit_id = v_resource_unit_id
+                ))
+            OR (uds.scope_type = 'Assigned' AND EXISTS (
                   SELECT 1 FROM nursing.nurses n
                   WHERE n.id = p_resource_id AND n.user_id = p_user_id
                 ))

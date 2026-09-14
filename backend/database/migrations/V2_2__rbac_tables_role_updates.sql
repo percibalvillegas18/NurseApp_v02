@@ -32,6 +32,17 @@ UPDATE rbac.role_permissions SET role_code =
   END
 WHERE role_code IS NULL;
 
+-- Repair (2026-09): drop the legacy V1 role_id VARCHAR NOT NULL column. Since this
+-- migration, role_code (FK -> system.hospital_roles.code) is the key — this matches
+-- the Prisma contract (rbac_role_menu_access / rbac_role_permissions have no role_id
+-- field). Leaving the NOT NULL column in place broke every later seed
+-- (V2_4, V4_0: 'null value in column role_id'). CASCADE also removes the superseded
+-- uk_*(role_id, ...) constraints; role_code replacements are added below.
+ALTER TABLE rbac.role_menu_access DROP CONSTRAINT IF EXISTS uk_role_menu_access;
+ALTER TABLE rbac.role_permissions DROP CONSTRAINT IF EXISTS uk_role_permissions;
+ALTER TABLE rbac.role_menu_access DROP COLUMN IF EXISTS role_id CASCADE;
+ALTER TABLE rbac.role_permissions DROP COLUMN IF EXISTS role_id CASCADE;
+
 -- Add FK constraints (only after hospital_roles seeded, so deferrable)
 -- We'll add them as NOT VALID initially, then validate later after seed
 ALTER TABLE rbac.role_menu_access DROP CONSTRAINT IF EXISTS fk_role_menu_access_hospital_roles;

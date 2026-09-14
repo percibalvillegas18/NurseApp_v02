@@ -192,9 +192,12 @@ export const Contract: React.FC = () => {
       dataIndex: 'contractNumber',
       key: 'contractNumber',
       render: (v: string, row: any) => (
-        <Button type="link" onClick={() => setDetailId(row.id)}>
-          {v}
-        </Button>
+        <Space size={4}>
+          <Button type="link" onClick={() => setDetailId(row.id)} style={{ padding: 0 }}>
+            {v}
+          </Button>
+          {row.isDemo && <Tag color="orange">TEMP</Tag>}
+        </Space>
       ),
     },
     {

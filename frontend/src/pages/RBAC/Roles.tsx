@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
-import { Card, Table, Tag, Button, Space, Typography, Alert, Modal, Form, Switch, message } from 'antd';
-import { EditOutlined, SafetyOutlined } from '@ant-design/icons';
+import React, { useMemo, useState } from 'react';
+import { Card, Table, Tag, Button, Space, Typography, Alert, Modal, Switch, message, Select } from 'antd';
+import { SafetyOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { rbacApi } from '../../api/client';
-import { HospitalRole } from '../../types';
+import { rbacApi, apiClient } from '../../api/client';
+import { ManagedRole, RolePermission } from '../../types';
 import { usePermission } from '../../hooks/useEffectiveAccess';
 
 const { Title } = Typography;
+
+const flattenMenus = (menus: any[]): any[] =>
+  (menus || []).flatMap((m) => [m, ...flattenMenus(m.children || [])]);
 
 export const Roles: React.FC = () => {
   const { allowed: canView } = usePermission('ROLES_PERMISSIONS', 'VIEW');
@@ -14,24 +17,23 @@ export const Roles: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [menuModalOpen, setMenuModalOpen] = useState(false);
+  const [permModalOpen, setPermModalOpen] = useState(false);
+  const [permMenuId, setPermMenuId] = useState<number | undefined>();
 
   const { data: rolesData, isLoading } = useQuery({
     queryKey: ['hospitalRoles'],
     queryFn: async () => {
-      // For now mock, in real backend add endpoint GET /rbac/hospital-roles
-      // We'll use static list matching seed
-      return [
-        { code: 'SYSTEM_ADMIN', name: 'System Administrator', category: 'System', department: 'IT', status: 'Active' },
-        { code: 'NURSE_MANAGER', name: 'Nurse Manager', category: 'Administrative', department: 'Nursing', status: 'Active' },
-        { code: 'CHARGE_NURSE', name: 'Charge Nurse', category: 'Clinical', department: 'Nursing', status: 'Active' },
-        { code: 'RN', name: 'Registered Nurse', category: 'Clinical', department: 'Nursing', status: 'Active' },
-        { code: 'LPN', name: 'Licensed Practical Nurse', category: 'Clinical', department: 'Nursing', status: 'Active' },
-        { code: 'CNA', name: 'Certified Nursing Assistant', category: 'Clinical', department: 'Nursing', status: 'Active' },
-        { code: 'SCHEDULER', name: 'Workforce Scheduler', category: 'Administrative', department: 'Nursing', status: 'Active' },
-        { code: 'HR_ADMIN', name: 'HR Administrator', category: 'Administrative', department: 'Human Resources', status: 'Active' },
-        { code: 'COMPLIANCE_OFFICER', name: 'Compliance Officer', category: 'Administrative', department: 'Compliance', status: 'Active' },
-        { code: 'READONLY_USER', name: 'Read-Only User', category: 'System', department: 'IT', status: 'Active' },
-      ] as HospitalRole[];
+      const res = await apiClient.get('/users/lookups');
+      return res.data.data.roles as ManagedRole[];
+    },
+    enabled: canView,
+  });
+
+  const { data: menus } = useQuery({
+    queryKey: ['menus-flat-roles'],
+    queryFn: async () => {
+      const res = await rbacApi.getMenus();
+      return flattenMenus(res.data.data.menus);
     },
     enabled: canView,
   });
@@ -42,7 +44,16 @@ export const Roles: React.FC = () => {
       const res = await rbacApi.getRoleMenuAccess(selectedRole!);
       return res.data.data.menuAccess;
     },
-    enabled: !!selectedRole && canView,
+    enabled: !!selectedRole && canView && menuModalOpen,
+  });
+
+  const { data: rolePermissions, isLoading: permsLoading } = useQuery({
+    queryKey: ['rolePermissions', selectedRole, permMenuId],
+    queryFn: async () => {
+      const res = await rbacApi.getRolePermissions(selectedRole!, permMenuId ? { menuId: permMenuId } : {});
+      return res.data.data.permissions as RolePermission[];
+    },
+    enabled: !!selectedRole && canView && permModalOpen,
   });
 
   const updateMenuAccessMutation = useMutation({
@@ -59,6 +70,28 @@ export const Roles: React.FC = () => {
     },
   });
 
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ roleCode, menuId, permissionId, allowed }: any) => {
+      const res = await rbacApi.updateRolePermission(roleCode, permissionId, menuId, {
+        allowed,
+        overrideReason: 'Admin override via UI',
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      message.success('Permission updated');
+      queryClient.invalidateQueries({ queryKey: ['rolePermissions', selectedRole, permMenuId] });
+    },
+    onError: (err: any) => {
+      message.error(err.response?.data?.message || 'Failed to update');
+    },
+  });
+
+  const menuOptions = useMemo(
+    () => (menus || []).map((m: any) => ({ value: m.id, label: `${m.code} — ${m.name}` })),
+    [menus],
+  );
+
   const columns = [
     { title: 'Code', dataIndex: 'code', key: 'code', render: (code: string) => <Tag color="blue">{code}</Tag> },
     { title: 'Name', dataIndex: 'name', key: 'name' },
@@ -68,20 +101,26 @@ export const Roles: React.FC = () => {
       key: 'category',
       render: (cat: string) => {
         const colors: any = { Clinical: 'green', Administrative: 'orange', System: 'red', Support: 'default' };
-        return <Tag color={colors[cat]}>{cat}</Tag>;
+        return <Tag color={colors[cat] || 'default'}>{cat}</Tag>;
       },
     },
-    { title: 'Department', dataIndex: 'department', key: 'department' },
-    { title: 'Status', dataIndex: 'status', key: 'status', render: (s: string) => <Tag color={s === 'Active' ? 'green' : 'red'}>{s}</Tag> },
+    { title: 'Status', key: 'status', render: () => <Tag color="green">Active</Tag> },
     {
       title: 'Action',
       key: 'action',
-      render: (_: any, record: HospitalRole) => (
+      render: (_: any, record: ManagedRole) => (
         <Space>
           <Button size="small" onClick={() => { setSelectedRole(record.code); setMenuModalOpen(true); }}>
             Menus
           </Button>
-          <Button size="small" icon={<EditOutlined />} disabled={!canManage}>
+          <Button
+            size="small"
+            onClick={() => {
+              setSelectedRole(record.code);
+              setPermMenuId(undefined);
+              setPermModalOpen(true);
+            }}
+          >
             Permissions
           </Button>
         </Space>
@@ -106,7 +145,7 @@ export const Roles: React.FC = () => {
         style={{ marginBottom: 16 }}
       />
 
-      <Card title="Hospital Roles (10 roles from V2_3 seed)" loading={isLoading}>
+      <Card title={`Hospital Roles (${(rolesData || []).length} roles)`} loading={isLoading}>
         <Table columns={columns} dataSource={rolesData} rowKey="code" pagination={false} />
       </Card>
 
@@ -153,6 +192,57 @@ export const Roles: React.FC = () => {
               ),
             },
             { title: 'Source', dataIndex: 'assignment_source', key: 'source', render: (s: string) => <Tag>{s}</Tag> },
+            { title: 'Override', dataIndex: 'override_flag', key: 'override', render: (f: boolean) => (f ? <Tag color="orange">Override</Tag> : <Tag>Default</Tag>) },
+          ]}
+        />
+      </Modal>
+
+      <Modal
+        title={`Permissions for ${selectedRole}`}
+        open={permModalOpen}
+        onCancel={() => setPermModalOpen(false)}
+        footer={null}
+        width={800}
+      >
+        <Space style={{ marginBottom: 12 }}>
+          <span>Menu:</span>
+          <Select
+            allowClear
+            placeholder="All menus"
+            style={{ width: 320 }}
+            options={menuOptions}
+            value={permMenuId}
+            onChange={(v) => setPermMenuId(v)}
+          />
+        </Space>
+        <Table
+          dataSource={rolePermissions || []}
+          rowKey="id"
+          loading={permsLoading}
+          pagination={{ pageSize: 10 }}
+          columns={[
+            { title: 'Menu', key: 'menu', render: (_: any, rec: RolePermission) => <Tag color="blue">{rec.menu?.code}</Tag> },
+            { title: 'Permission', key: 'perm', render: (_: any, rec: RolePermission) => rec.permission?.code },
+            {
+              title: 'Allowed',
+              dataIndex: 'allowed',
+              key: 'allowed',
+              render: (allowed: boolean, rec: RolePermission) => (
+                <Switch
+                  checked={allowed}
+                  disabled={!canManage}
+                  onChange={(checked) => {
+                    updatePermissionMutation.mutate({
+                      roleCode: selectedRole,
+                      menuId: rec.menu_id,
+                      permissionId: rec.permission_id,
+                      allowed: checked,
+                    });
+                  }}
+                />
+              ),
+            },
+            { title: 'Source', dataIndex: 'source', key: 'source', render: (s: string) => <Tag>{s}</Tag> },
             { title: 'Override', dataIndex: 'override_flag', key: 'override', render: (f: boolean) => (f ? <Tag color="orange">Override</Tag> : <Tag>Default</Tag>) },
           ]}
         />

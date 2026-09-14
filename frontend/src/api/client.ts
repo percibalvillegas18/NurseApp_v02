@@ -139,6 +139,7 @@ export const rbacApi = {
 
   // Access Levels
   getAccessLevels: (params?: any) => apiClient.get('/rbac/access-levels', { params }),
+  createAccessLevel: (data: any) => apiClient.post('/rbac/access-levels', data),
 };
 
 export const auditApi = {
@@ -182,4 +183,44 @@ export const nursingApi = {
 
 export const contractsApi = {
   getPositionHierarchy: () => apiClient.get('/contracts/positions/hierarchy'),
+};
+
+// ============================================================================
+// Leave management API (mock /leave/* — Nest module not built yet)
+// ============================================================================
+export const leaveApi = {
+  getTypes: () => apiClient.get('/leave/types'),
+  getBalances: (nurseId?: number) =>
+    apiClient.get('/leave/balances', { params: nurseId ? { nurseId } : {} }),
+  getRequests: (params?: any) => apiClient.get('/leave/requests', { params }),
+  getRequest: (id: number) => apiClient.get(`/leave/requests/${id}`),
+  createRequest: (data: any) => apiClient.post('/leave/requests', data),
+  updateRequest: (id: number, data: any) => apiClient.patch(`/leave/requests/${id}`, data),
+  submitRequest: (id: number) => apiClient.post(`/leave/requests/${id}/submit`),
+  approveRequest: (id: number, note?: string) =>
+    apiClient.post(`/leave/requests/${id}/approve`, note ? { note } : {}),
+  rejectRequest: (id: number, note: string) =>
+    apiClient.post(`/leave/requests/${id}/reject`, { note }),
+  cancelRequest: (id: number, note?: string) =>
+    apiClient.post(`/leave/requests/${id}/cancel`, note ? { note } : {}),
+};
+
+// ============================================================================
+// Workforce analytics API (mock /analytics/* — computed live, Nest pending)
+// ============================================================================
+export const analyticsApi = {
+  getSummary: () => apiClient.get('/analytics/summary'),
+  getCredentials: () => apiClient.get('/analytics/credentials'),
+  getContracts: () => apiClient.get('/analytics/contracts'),
+  getRoster: (params?: any) => apiClient.get('/analytics/roster', { params }),
+  getLeave: (year?: string) =>
+    apiClient.get('/analytics/leave', { params: year ? { year } : {} }),
+};
+
+// ============================================================================
+// System settings API (mock /settings — Nest pending)
+// ============================================================================
+export const settingsApi = {
+  getSettings: () => apiClient.get('/settings'),
+  updateSettings: (data: any) => apiClient.patch('/settings', data),
 };

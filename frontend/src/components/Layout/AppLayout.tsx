@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Avatar, Dropdown, Badge, Space, Typography, theme } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Layout, Menu, Avatar, Dropdown, Badge, Space, Typography, theme, Empty } from 'antd';
 import {
   DashboardOutlined,
   TeamOutlined,
@@ -15,10 +15,16 @@ import {
   BellOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
+  CalendarOutlined,
+  ThunderboltOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccessibleMenus } from '../../hooks/useEffectiveAccess';
+import { useExpiringCredentials } from '../../hooks/useNursing';
+import { apiClient, leaveApi } from '../../api/client';
 import type { MenuProps } from 'antd';
 
 const { Header, Sider, Content } = Layout;
@@ -28,6 +34,37 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
+/** Parent submenu keys for a path. Dynamic (backend) parents are keyed by route
+ *  (/nursing, /scheduling, /admin); the static fallback uses bare names —
+ *  return both, Ant Menu ignores keys that don't exist. */
+const keysForPath = (path: string): string[] => {
+  const seg = path.split('/')[1];
+  if (['nursing', 'scheduling', 'admin'].includes(seg)) return [`/${seg}`, seg];
+  return [];
+};
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  DASHBOARD: <DashboardOutlined />,
+  NURSING_WORKFORCE: <TeamOutlined />,
+  NURSE_MASTER: <TeamOutlined />,
+  CREDENTIALS: <IdcardOutlined />,
+  CONTRACT: <FileTextOutlined />,
+  DOCUMENTS: <FolderOpenOutlined />,
+  SCHEDULING: <ScheduleOutlined />,
+  NURSE_ROSTER: <ScheduleOutlined />,
+  LEAVE_MANAGEMENT: <CalendarOutlined />,
+  WORKFORCE_ANALYTICS: <BarChartOutlined />,
+  ADMINISTRATION: <SettingOutlined />,
+  USER_MANAGEMENT: <UserOutlined />,
+  ROLES_PERMISSIONS: <SafetyOutlined />,
+  EFFECTIVE_ACCESS: <KeyOutlined />,
+  CACHE_STATS: <ThunderboltOutlined />,
+  ACCESS_LEVEL_MASTER: <KeyOutlined />,
+  MENU_MASTER: <MenuOutlined />,
+  AUDIT_LOGS: <AuditOutlined />,
+  SYSTEM_SETTINGS: <SettingOutlined />,
+};
+
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
@@ -35,6 +72,83 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { data: accessibleMenus } = useAccessibleMenus();
   const { token: themeToken } = theme.useToken();
+
+  // Keep the current section's submenu open across navigations (dynamic menus
+  // are keyed by route, so derive from the pathname; never auto-close).
+  const [openKeys, setOpenKeys] = useState<string[]>(() => keysForPath(location.pathname));
+  useEffect(() => {
+    const needed = keysForPath(location.pathname);
+    setOpenKeys((prev) => (needed.every((k) => prev.includes(k)) ? prev : [...prev, ...needed]));
+  }, [location.pathname]);
+
+  // Routes that are parent groups (have children) must expand, not navigate —
+  // /nursing, /scheduling and /admin have no pages of their own.
+  const parentKeys = useMemo(() => {
+    const set = new Set<string>();
+    const walk = (menus: any[]) => {
+      for (const m of menus || []) {
+        if (m.children?.length) {
+          if (m.route) set.add(m.route);
+          walk(m.children);
+        }
+      }
+    };
+    walk(accessibleMenus || []);
+    return set;
+  }, [accessibleMenus]);
+
+  // ---- Live notifications: expiries + pending approvals (retry off: a 403 on
+  // any one source must not break the shell, it just contributes zero) ----
+  const { data: expiringCreds } = useExpiringCredentials(30);
+  const { data: expiringContracts } = useQuery({
+    queryKey: ['notifications-contracts-expiring'],
+    queryFn: async () => {
+      const res = await apiClient.get('/contracts/expiring', { params: { days: 90 } });
+      return res.data.data as any[];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const { data: pendingLeave } = useQuery({
+    queryKey: ['notifications-leave-pending'],
+    queryFn: async () => {
+      const res = await leaveApi.getRequests({ status: 'Submitted', limit: 5 });
+      return res.data.data as { items: any[]; pagination: any };
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const notifications = useMemo(() => {
+    const groups: NonNullable<MenuProps['items']> = [];
+    const credItems = (expiringCreds?.items || []).slice(0, 3).map((c: any) => ({
+      key: `cred-${c.id}`,
+      label: `${c.name} — ${c.nurse?.fullName || `#${c.nurseId}`} (${c.daysUntilExpiry}d left)`,
+      onClick: () => navigate('/nursing/credentials'),
+    }));
+    if (credItems.length) groups.push({ key: 'g-creds', label: 'Credentials expiring', type: 'group', children: credItems });
+
+    const ctrItems = (expiringContracts || []).slice(0, 3).map((c: any) => ({
+      key: `ctr-${c.id}`,
+      label: `${c.contractNumber} ends ${c.endDate}`,
+      onClick: () => navigate('/nursing/contract'),
+    }));
+    if (ctrItems.length) groups.push({ key: 'g-ctrs', label: 'Contracts expiring', type: 'group', children: ctrItems });
+
+    const leaveItems = (pendingLeave?.items || []).slice(0, 3).map((r: any) => ({
+      key: `leave-${r.id}`,
+      label: `Leave #${r.id} — ${r.nurse?.fullName || ''} awaits approval`,
+      onClick: () => navigate('/scheduling/leave'),
+    }));
+    if (leaveItems.length) groups.push({ key: 'g-leave', label: 'Pending leave', type: 'group', children: leaveItems });
+
+    return groups;
+  }, [expiringCreds, expiringContracts, pendingLeave, navigate]);
+
+  const notificationCount =
+    (expiringCreds?.items.length || 0) +
+    (expiringContracts?.length || 0) +
+    (pendingLeave?.pagination?.total ?? pendingLeave?.items.length ?? 0);
 
   const handleLogout = async () => {
     await logout();
@@ -52,6 +166,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Settings',
+      onClick: () => navigate('/admin/settings'),
     },
     {
       type: 'divider',
@@ -70,31 +185,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     // If we have dynamic menus from backend, use them
     if (accessibleMenus && accessibleMenus.length > 0) {
       const buildItems = (menus: any[]): MenuProps['items'] => {
-        return menus.map((menu) => {
-          const iconMap: Record<string, React.ReactNode> = {
-            DASHBOARD: <DashboardOutlined />,
-            NURSING_WORKFORCE: <TeamOutlined />,
-            NURSE_MASTER: <TeamOutlined />,
-            CONTRACT: <FileTextOutlined />,
-            DOCUMENTS: <FolderOpenOutlined />,
-            SCHEDULING: <ScheduleOutlined />,
-            NURSE_ROSTER: <ScheduleOutlined />,
-            WORKFORCE_ANALYTICS: <BarChartOutlined />,
-            ADMINISTRATION: <SettingOutlined />,
-            USER_MANAGEMENT: <UserOutlined />,
-            ROLES_PERMISSIONS: <SafetyOutlined />,
-            AUDIT_LOGS: <AuditOutlined />,
-            ACCESS_LEVEL_MASTER: <KeyOutlined />,
-            MENU_MASTER: <MenuOutlined />,
-          };
-
-          return {
-            key: menu.route || menu.code,
-            icon: iconMap[menu.code] || <DashboardOutlined />,
-            label: menu.name,
-            children: menu.children && menu.children.length > 0 ? buildItems(menu.children) : undefined,
-          };
-        });
+        return menus.map((menu) => ({
+          key: menu.route || menu.code,
+          icon: ICON_MAP[menu.code] || <DashboardOutlined />,
+          label: menu.name,
+          children: menu.children && menu.children.length > 0 ? buildItems(menu.children) : undefined,
+        }));
       };
       return buildItems(accessibleMenus);
     }
@@ -150,13 +246,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   const selectedKeys = [location.pathname];
-  const openKeys = (() => {
-    const path = location.pathname;
-    if (path.startsWith('/nursing')) return ['nursing'];
-    if (path.startsWith('/scheduling')) return ['scheduling'];
-    if (path.startsWith('/admin')) return ['admin'];
-    return [];
-  })();
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -195,10 +284,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           theme="dark"
           mode="inline"
           selectedKeys={selectedKeys}
-          defaultOpenKeys={openKeys}
+          openKeys={openKeys}
+          onOpenChange={(keys) => setOpenKeys(keys as string[])}
           items={getMenuItems()}
           onClick={({ key }) => {
-            if (key.startsWith('/')) {
+            if (key.startsWith('/') && !parentKeys.has(key)) {
               navigate(key);
             }
           }}
@@ -236,9 +326,20 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           <Space size={24}>
-            <Badge count={5} size="small">
-              <BellOutlined style={{ fontSize: 18, cursor: 'pointer' }} />
-            </Badge>
+            <Dropdown
+              menu={{
+                items:
+                  notifications.length > 0
+                    ? notifications
+                    : [{ key: 'empty', label: <Empty description="All clear" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }],
+              }}
+              placement="bottomRight"
+              trigger={['click']}
+            >
+              <Badge count={notificationCount} size="small" overflowCount={99}>
+                <BellOutlined style={{ fontSize: 18, cursor: 'pointer' }} />
+              </Badge>
+            </Dropdown>
 
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>

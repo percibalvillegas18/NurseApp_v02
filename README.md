@@ -215,7 +215,7 @@ Aggregates **all** active roles (not only `primary_role_id`), `BOOL_OR` on menu 
 ## Next steps
 
 - Enforce **roster → `nurse_has_valid_contract`** on every Nest and mock create/update path
-- Leave management + workforce analytics
+- Graduate **leave management + workforce analytics** from mock to Nest modules (UI + mock API done — see `docs/LEAVE_MANAGEMENT.md`, `docs/WORKFORCE_ANALYTICS.md`)
 - MFA, row-level security on PHI tables, automated partition retention
 - Close remaining HIPAA gaps from the checklist
 - Load / security testing
@@ -234,7 +234,11 @@ Aggregates **all** active roles (not only `primary_role_id`), `BOOL_OR` on menu 
 | `docs/CONTRACT_EXPIRY_ALERTS.md` | Automated expiry notifications |
 | `docs/CONTRACT_ACTIVE_EXCLUSIVITY.md` | Option A GiST constraint |
 | `docs/ROSTER_CONTRACT_GUARD.md` | Valid-contract gate for roster |
+| `docs/DEMO_DATA.md` | TEMP demo dataset (10 role logins, 9 nurses, passports) + seed/clear API |
+| `docs/LEAVE_MANAGEMENT.md` | Leave lifecycle, balances, roster interplay (mock + UI live, Nest TODO) |
+| `docs/WORKFORCE_ANALYTICS.md` | Live-computed workforce KPIs (mock + UI live, Nest TODO) |
 | `docs/STAFF_CREDENTIAL_TRACKING.md` | Credential templates & tracking |
+| `docs/LARAVEL_CONVERSION.md` | PostgreSQL readiness (done) + NestJS → Laravel mapping & phased plan |
 | `REDIS_CACHING.md` | Cache keys and invalidation |
 | `ANALYSIS.md` | Deep analysis |
 | `backend/README.md` | Backend-specific notes |

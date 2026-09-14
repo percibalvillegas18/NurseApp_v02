@@ -10,11 +10,17 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { NurseMaster } from './pages/NurseMaster';
 import { Roster } from './pages/Roster';
+import { Leave } from './pages/Leave';
+import { Analytics } from './pages/Analytics';
 import { Credentials } from './pages/Credentials';
 import { Contract } from './pages/Contract';
 import { Documents } from './pages/Documents';
 import { Users } from './pages/Users';
+import { Profile } from './pages/Profile';
+import { SystemSettings } from './pages/SystemSettings';
 import { Roles } from './pages/RBAC/Roles';
+import { AccessLevels } from './pages/RBAC/AccessLevels';
+import { MenuMaster } from './pages/RBAC/MenuMaster';
 import { EffectiveAccessPage } from './pages/RBAC/EffectiveAccess';
 import { AuditLogs } from './pages/RBAC/AuditLogs';
 import { CacheStats } from './pages/RBAC/CacheStats';
@@ -89,6 +95,28 @@ const App: React.FC = () => {
                   }
                 />
 
+                <Route
+                  path="/scheduling/leave"
+                  element={
+                    <ProtectedRoute menuCode="LEAVE_MANAGEMENT" permissionCode="VIEW">
+                      <AppLayout>
+                        <Leave />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/analytics"
+                  element={
+                    <ProtectedRoute menuCode="WORKFORCE_ANALYTICS" permissionCode="VIEW">
+                      <AppLayout>
+                        <Analytics />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
                 {/* RBAC Admin - requires ROLES_PERMISSIONS VIEW */}
                 <Route
                   path="/admin/rbac"
@@ -104,7 +132,7 @@ const App: React.FC = () => {
                 <Route
                   path="/admin/effective-access"
                   element={
-                    <ProtectedRoute menuCode="USER_MANAGEMENT" permissionCode="VIEW">
+                    <ProtectedRoute menuCode="EFFECTIVE_ACCESS" permissionCode="VIEW">
                       <AppLayout>
                         <EffectiveAccessPage />
                       </AppLayout>
@@ -126,9 +154,42 @@ const App: React.FC = () => {
                 <Route
                   path="/admin/cache"
                   element={
-                    <ProtectedRoute menuCode="SYSTEM_SETTINGS" permissionCode="VIEW">
+                    <ProtectedRoute menuCode="CACHE_STATS" permissionCode="VIEW">
                       <AppLayout>
                         <CacheStats />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/admin/access-levels"
+                  element={
+                    <ProtectedRoute menuCode="ACCESS_LEVEL_MASTER" permissionCode="VIEW">
+                      <AppLayout>
+                        <AccessLevels />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/admin/menus"
+                  element={
+                    <ProtectedRoute menuCode="MENU_MASTER" permissionCode="VIEW">
+                      <AppLayout>
+                        <MenuMaster />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <ProtectedRoute menuCode="SYSTEM_SETTINGS" permissionCode="VIEW">
+                      <AppLayout>
+                        <SystemSettings />
                       </AppLayout>
                     </ProtectedRoute>
                   }
@@ -174,6 +235,18 @@ const App: React.FC = () => {
                     <ProtectedRoute menuCode="USER_MANAGEMENT" permissionCode="VIEW">
                       <AppLayout>
                         <Users />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Self-service: any authenticated user */}
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Profile />
                       </AppLayout>
                     </ProtectedRoute>
                   }

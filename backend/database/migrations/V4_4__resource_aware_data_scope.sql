@@ -112,8 +112,10 @@ BEGIN
   END IF;
 
   -- Menu
-  SELECT m.id, m.status, COALESCE(m.is_visible, TRUE), COALESCE(m.is_enabled, TRUE)
-    INTO v_menu_id, v_menu_status, v_menu_visible, v_menu_enabled
+  -- NOTE (repair 2026-09): rbac.menus has no is_visible/is_enabled columns —
+  -- visibility/enabled live in rbac.role_menu_access per role. Gate on status here.
+  SELECT m.id, m.status
+    INTO v_menu_id, v_menu_status
   FROM rbac.menus m
   WHERE m.code = p_menu_code;
 
@@ -124,8 +126,10 @@ BEGIN
     RETURN;
   END IF;
   v_menu_found := TRUE;
+  v_menu_visible := TRUE;
+  v_menu_enabled := TRUE;
 
-  IF v_menu_status IS DISTINCT FROM 'Active' OR NOT v_menu_enabled THEN
+  IF v_menu_status IS DISTINCT FROM 'Active' THEN
     RETURN QUERY SELECT 'DENY'::VARCHAR(50),
       ('Menu not active/enabled: ' || p_menu_code)::VARCHAR(500),
       FALSE, FALSE, FALSE, 0, v_now, v_primary_role_code, v_all_role_codes;
@@ -138,7 +142,10 @@ BEGIN
     WHERE rma.role_code = ANY (v_all_role_codes)
       AND rma.menu_id = v_menu_id
       AND rma.status = 'Active'
-      AND rma.allowed = TRUE
+      -- NOTE (repair 2026-09): role_menu_access has no 'allowed' column —
+      -- menu access requires visible AND enabled (role_permissions.allowed is separate).
+      AND rma.visible = TRUE
+      AND rma.enabled = TRUE
       AND (rma.effective_from IS NULL OR rma.effective_from <= v_now)
       AND (rma.effective_to IS NULL OR rma.effective_to >= v_now)
   ) INTO v_menu_visible;

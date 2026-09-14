@@ -30,6 +30,7 @@ const order = [
   'V4_2__contract_active_exclusivity.sql',
   'V4_3__staff_credential_tracking.sql',
   'V4_4__resource_aware_data_scope.sql',
+  'V4_5__evaluate_access_resource_type.sql',
   'V4_10__positions_hierarchy.sql',
 ];
 
