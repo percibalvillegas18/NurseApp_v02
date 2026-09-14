@@ -201,6 +201,9 @@ for (const protectedPath of [
   '/api/v1/audit',
   '/api/v1/cache',
   '/api/v1/contracts',
+  '/api/v1/leave',
+  '/api/v1/analytics',
+  '/api/v1/settings',
   '/api/v1/auth/attempts',
   '/api/v1/auth/reset-attempts',
 ]) {
@@ -414,6 +417,7 @@ function mapManagedUser(u) {
     email: u.email,
     fullName: u.fullName || u.full_name,
     status: u.status || 'Active',
+    isDemo: !!u.isDemo,
     emailVerified: true,
     lastLoginAt: u.lastLoginAt || null,
     failedLoginAttempts: attempts.count || 0,
@@ -435,7 +439,8 @@ app.get('/', (req, res) => {
         <h1>🚀 Nurse-App Mock Backend</h1>
         <p>Mode: MOCK &mdash; in-memory, no DB/Redis required. <strong>Demo &amp; preview only; never deploy.</strong></p>
         <p>Serves the same <code>/api/v1</code> surface as the NestJS backend: auth, users, nursing
-           (nurses / credentials / roster), rbac, audit and cache.</p>
+           (nurses / credentials / roster), contracts, leave, analytics, settings,
+           rbac, audit and cache.</p>
 
         <h3>Open endpoints (no token)</h3>
         <ul>
@@ -444,13 +449,15 @@ app.get('/', (req, res) => {
           <li><a href="/api/v1/mock/routes">GET /api/v1/mock/routes</a> &mdash; every registered route</li>
           <li><a href="/api/v1/mock/state">GET /api/v1/mock/state</a> &mdash; in-memory data counts</li>
           <li>POST /api/v1/mock/reset &mdash; clear all login counters</li>
+          <li>GET /api/v1/mock/demo &middot; POST /api/v1/mock/demo/seed &middot; DELETE /api/v1/mock/demo &mdash; TEMP demo dataset (10 role logins, 9 nurses, passports)</li>
           <li>POST /api/v1/auth/login &mdash; returns the Bearer token everything else needs</li>
         </ul>
 
         <h3>Protected endpoints (Bearer token required)</h3>
         <p><code>/api/v1/users</code>, <code>/api/v1/nursing</code>, <code>/api/v1/rbac</code>,
            <code>/api/v1/audit</code>, <code>/api/v1/cache</code>,
-           <code>/api/v1/auth/attempts</code>, <code>/api/v1/auth/reset-attempts</code>
+           <code>/api/v1/auth/attempts</code>, <code>/api/v1/auth/reset-attempts</code>,
+           <code>/api/v1/leave</code>, <code>/api/v1/analytics</code>, <code>/api/v1/settings</code>
            &rarr; <code>401 TOKEN_REQUIRED</code> without a valid token from <code>/auth/login</code>.</p>
 
         <h3>Lockout</h3>
@@ -1236,6 +1243,108 @@ app.patch('/api/v1/rbac/roles/:roleId/menu-access/:menuId', (req, res) => {
   });
 });
 
+// ---- Role ↔ permission matrix (Nest parity: getRolePermissions) ----
+// Defaults encode the hospital's policy; PATCH stores in-memory overrides
+// (source flips AccessLevelDefault -> ManualOverride, like the Nest service).
+const MOCK_PERMISSIONS = [
+  { id: 1, code: 'VIEW', name: 'View' },
+  { id: 2, code: 'CREATE', name: 'Create' },
+  { id: 3, code: 'EDIT', name: 'Edit' },
+  { id: 4, code: 'DELETE', name: 'Delete' },
+  { id: 7, code: 'MANAGE', name: 'Manage' },
+];
+const ADMIN_MENU_CODES = [
+  'USER_MANAGEMENT', 'ROLES_PERMISSIONS', 'EFFECTIVE_ACCESS', 'CACHE_STATS',
+  'ACCESS_LEVEL_MASTER', 'MENU_MASTER', 'AUDIT_LOGS', 'SYSTEM_SETTINGS',
+];
+const rolePermissionOverrides = new Map(); // `${role}|${menuId}|${permId}` -> { allowed }
+
+function defaultPermissionAllowed(role, menuCode, permCode) {
+  if (role === 'SYSTEM_ADMIN') return true;
+  if (role === 'READONLY_USER') return menuCode === 'DASHBOARD' && permCode === 'VIEW';
+  const isAdminMenu = ADMIN_MENU_CODES.includes(menuCode);
+  if (isAdminMenu) {
+    if (role === 'NURSE_MANAGER') {
+      if (menuCode === 'SYSTEM_SETTINGS') return permCode === 'VIEW';
+      return ['VIEW', 'CREATE', 'EDIT'].includes(permCode);
+    }
+    if (role === 'HR_ADMIN') {
+      return ['USER_MANAGEMENT', 'EFFECTIVE_ACCESS'].includes(menuCode) &&
+        ['VIEW', 'CREATE', 'EDIT'].includes(permCode);
+    }
+    if (role === 'COMPLIANCE_OFFICER') {
+      return menuCode === 'AUDIT_LOGS' && ['VIEW', 'CREATE'].includes(permCode);
+    }
+    return false;
+  }
+  // Workforce / scheduling / analytics menus
+  if (permCode === 'VIEW') return true;
+  if (permCode === 'CREATE' || permCode === 'EDIT') {
+    if (['NURSE_MANAGER', 'CHARGE_NURSE', 'SCHEDULER', 'HR_ADMIN'].includes(role)) return true;
+    if (role === 'RN') return ['NURSE_ROSTER', 'CREDENTIALS', 'LEAVE_MANAGEMENT', 'DOCUMENTS'].includes(menuCode);
+    return false;
+  }
+  // DELETE / MANAGE
+  if (role === 'NURSE_MANAGER') return true;
+  if (role === 'SCHEDULER') return ['NURSE_ROSTER', 'LEAVE_MANAGEMENT'].includes(menuCode);
+  return false;
+}
+
+function buildRolePermissionRow(role, menu, perm) {
+  const key = `${role}|${menu.id}|${perm.id}`;
+  const ov = rolePermissionOverrides.get(key);
+  return {
+    id: menu.id * 100 + perm.id,
+    role_code: role,
+    menu_id: menu.id,
+    permission_id: perm.id,
+    menu: { code: menu.code, name: menu.name },
+    permission: { code: perm.code, name: perm.name },
+    allowed: ov ? ov.allowed : defaultPermissionAllowed(role, menu.code, perm.code),
+    source: ov ? 'ManualOverride' : 'AccessLevelDefault',
+    override_flag: !!ov,
+    status: 'Active',
+  };
+}
+
+const flatMockMenus = () => mockMenus.flatMap((m) => [m, ...(m.children || [])]);
+
+app.get('/api/v1/rbac/roles/:roleId/permissions', (req, res) => {
+  const role = req.params.roleId;
+  let items = flatMockMenus().flatMap((menu) =>
+    MOCK_PERMISSIONS.map((perm) => buildRolePermissionRow(role, menu, perm)),
+  );
+  if (req.query.menuId) items = items.filter((i) => i.menu_id === parseInt(req.query.menuId, 10));
+  if (req.query.allowedOnly === 'true') items = items.filter((i) => i.allowed);
+  res.json({
+    success: true,
+    data: { roleId: role, permissions: items },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.patch('/api/v1/rbac/roles/:roleId/permissions/:permissionId', (req, res) => {
+  const role = req.params.roleId;
+  const permId = parseInt(req.params.permissionId, 10);
+  const menuId = parseInt(req.query.menuId, 10);
+  if (!menuId) {
+    return res.status(400).json({ success: false, message: 'menuId query param is required', timestamp: new Date().toISOString() });
+  }
+  const menu = flatMockMenus().find((m) => m.id === menuId);
+  const perm = MOCK_PERMISSIONS.find((p) => p.id === permId);
+  if (!menu || !perm) {
+    return res.status(404).json({ success: false, message: 'Menu or permission not found', timestamp: new Date().toISOString() });
+  }
+  rolePermissionOverrides.set(`${role}|${menuId}|${permId}`, { allowed: !!(req.body || {}).allowed });
+  console.log(`[MOCK] Update role permission: role=${role} menu=${menu.code} perm=${perm.code} allowed=${!!(req.body || {}).allowed}`);
+  res.json({
+    success: true,
+    data: buildRolePermissionRow(role, menu, perm),
+    message: 'Role permission updated (MOCK) - Cache invalidated for role',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/api/v1/cache/stats', (req, res) => {
   res.json({
     success: true,
@@ -1505,6 +1614,7 @@ function mapMockCredential(c) {
   return {
     id: c.id, nurseId: c.nurseId, templateCode: c.templateCode || null, trackingData: c.trackingData || {},
     category: tpl ? tpl.category : null,
+    isDemo: !!c.isDemo,
     credentialType: c.credentialType, name: c.name,
     issuingAuthority: c.issuingAuthority, credentialNumber: c.credentialNumber,
     issuedDate: c.issuedDate, expiryDate: c.expiryDate,
@@ -1550,6 +1660,7 @@ function mapMockNurse(n) {
     department: dept ? { id: dept.id, name: dept.name } : null,
     homeUnit: homeUnit ? { id: homeUnit.id, code: homeUnit.code, name: homeUnit.name, departmentId: homeUnit.department_id } : null,
     ...summarizeMockCredentials(n.id),
+    isDemo: !!n.isDemo,
     createdAt: n.createdAt, updatedAt: n.updatedAt,
   };
 }
@@ -2131,6 +2242,53 @@ try {
   console.warn('[MOCK] Contract routes not loaded:', e.message);
 }
 
+// Workforce mock routes: leave, analytics, settings, RBAC access-levels
+// (needs contract locals + nursing arrays, so it loads AFTER the block above)
+let workforceApi = null;
+try {
+  workforceApi = require('./mock-workforce-routes')(app, {
+    mockNurses,
+    mockUsers,
+    mockMenus,
+    mockCredentials,
+    mockRoster,
+    mockUnits,
+    mockShifts,
+  });
+  console.log('[MOCK] Workforce routes registered (leave / analytics / settings / access-levels)');
+} catch (e) {
+  console.warn('[MOCK] Workforce routes not loaded:', e.message);
+}
+
+// TEMP demo dataset: demo logins for every role + demo nurses on every
+// position with passport/iqama/ID/license credentials (mock-demo-seed.js).
+// Seeded on startup; DELETE /api/v1/mock/demo removes every demo row
+// (users, nurses, credentials, contracts + orphan roster/leave rows).
+try {
+  const demoSeed = require('./mock-demo-seed')(app, {
+    mockUsers,
+    MOCK_USER_ROLES,
+    mockNurses,
+    mockCredentials,
+    mockNurseRoles,
+    mockUnits,
+    mockRoster,
+    mockLeaveRequests: workforceApi ? workforceApi.mockLeaveRequests : [],
+    mockCredentialDocuments,
+    issuedAccessTokens,
+    issuedRefreshTokens,
+    loginAttempts,
+  });
+  // Reserve IDs past seeded demo rows so later POSTs can't collide
+  nextNurseId = Math.max(nextNurseId - 1, ...mockNurses.map((n) => n.id)) + 1;
+  nextCredentialId = Math.max(nextCredentialId - 1, ...mockCredentials.map((c) => c.id)) + 1;
+  nextRosterId = Math.max(nextRosterId - 1, ...mockRoster.map((a) => a.id)) + 1;
+  const ds = demoSeed.stats();
+  console.log(`[MOCK] Demo dataset (TEMP): ${ds.users} users, ${ds.nurses} nurses, ${ds.credentials} credentials, ${ds.contracts} contracts, ${ds.rosterAssignments} roster`);
+} catch (e) {
+  console.warn('[MOCK] Demo seed not loaded:', e.message);
+}
+
 // ── DEV: Mock introspection endpoints (Patch 5) ──────────────────────────────
 // Not behind requireMockAuth on purpose - they expose no hospital data, only
 // server internals, and they are the fastest way to debug the preview.
@@ -2158,6 +2316,7 @@ app.get('/api/v1/mock/state', (req, res) => {
       nurses: typeof mockNurses !== 'undefined' ? mockNurses.filter((n) => !n._deleted).length : 'n/a',
       credentials: typeof mockCredentials !== 'undefined' ? mockCredentials.length : 'n/a',
       rosterAssignments: typeof mockRoster !== 'undefined' ? mockRoster.filter((r) => r.status !== 'Cancelled').length : 'n/a',
+      demo: app.locals.demoStats || { seeded: false, users: 0, nurses: 0, credentials: 0, contracts: 0, rosterAssignments: 0 },
       loginAttempts: Object.entries(loginAttempts)
         .map(([user, rec]) => ({ user, ...refreshRecord(rec) }))
         .filter((rec) => rec.count > 0),
@@ -2194,7 +2353,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧭 Route list:    http://0.0.0.0:${PORT}/api/v1/mock/routes`);
   console.log(`🧪 State:         http://0.0.0.0:${PORT}/api/v1/mock/state`);
   console.log(`🔁 Reset counters: POST http://0.0.0.0:${PORT}/api/v1/mock/reset`);
-  console.log(`📦 ${routeCount} routes | auth required on /users /nursing /rbac /audit /cache /auth/attempts*`);
+  console.log(`📦 ${routeCount} routes | auth required on /users /nursing /rbac /audit /cache /contracts /leave /analytics /settings /auth/attempts*`);
   console.log(`🔒 Lockout: ${MAX_ATTEMPTS} fails -> ${Math.round(LOCK_DURATION_MS / 60000)} min PER ACCOUNT | ${MAX_ATTEMPTS_PER_IP} unknown-username fails -> per-IP throttle | no global lockout`);
   console.log(`👥 Demo users (password ${DEFAULT_MOCK_PASSWORD}): ${Object.keys(mockUsers).join(', ')}`);
 });

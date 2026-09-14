@@ -10,9 +10,9 @@ export default defineConfig({
     cors: true,
     // @ts-ignore - for Arena preview
     allowedHosts: true as any,
-    headers: {
-      'X-Frame-Options': 'ALLOWALL',
-    },
+    // NOTE: no X-Frame-Options header on purpose — the preview embeds this
+    // app in an iframe, and 'ALLOWALL' is not a valid token (browsers ignore
+    // it, but some preview proxies flag the header as embedding-blocked).
     hmr: {
       clientPort: 443,
     },

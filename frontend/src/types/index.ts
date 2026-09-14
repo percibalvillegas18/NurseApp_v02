@@ -222,6 +222,8 @@ export interface Nurse {
   positionCode: string | null;
   department: { id: number; name: string } | null;
   homeUnit: { id: number; code: string; name: string; departmentId: number } | null;
+  /** TEMP demo dataset marker (mock /api/v1/mock/demo) */
+  isDemo?: boolean;
   credentialSummary: CredentialSummary;
   credentialCounts: { total: number; expired: number; expiringSoon: number };
   createdAt: string;
@@ -244,6 +246,8 @@ export interface NurseCredential {
   status: CredentialStatus;
   verifiedBy: number | null;
   verifiedAt: string | null;
+  /** TEMP demo dataset marker (mock /api/v1/mock/demo) */
+  isDemo?: boolean;
   nurse?: { id: number; employeeNumber: string; fullName: string } | null;
   createdAt: string;
   updatedAt: string;
@@ -342,6 +346,8 @@ export interface ManagedUser {
   lockedUntil: string | null;
   primaryRole: ManagedRole | null;
   roles: ManagedRole[];
+  /** TEMP demo dataset marker (mock /api/v1/mock/demo) */
+  isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -387,4 +393,176 @@ export interface CreateUserPayload {
   primary_role_id: number;
   role_ids?: number[];
   status?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Leave Management (Scheduling -> Leave Management)
+// ---------------------------------------------------------------------------
+export type LeaveRequestStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled';
+
+export interface LeaveType {
+  code: string;
+  name: string;
+  annualEntitlement: number;
+  paid: boolean;
+  requiresApproval: boolean;
+  description: string;
+}
+
+export interface LeaveBalance {
+  nurseId: number;
+  leaveTypeCode: string;
+  leaveTypeName: string;
+  paid: boolean;
+  entitled: number;
+  used: number;
+  pending: number;
+  /** null for unpaid types (no cap) */
+  remaining: number | null;
+}
+
+export interface LeaveNurseBalance {
+  nurse: { id: number; employeeNumber: string; jobNo: string; fullName: string };
+  balances: LeaveBalance[];
+}
+
+export interface RosterClash {
+  assignmentId: number;
+  date: string;
+  unitCode?: string;
+  shiftCode?: string;
+  status: string;
+}
+
+export interface LeaveRequest {
+  id: number;
+  nurseId: number;
+  leaveTypeCode: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string | null;
+  contactInfo: string | null;
+  status: LeaveRequestStatus;
+  submittedAt: string | null;
+  decidedBy: number | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  nurse?: { id: number; employeeNumber: string; jobNo: string; fullName: string };
+  leaveType?: { code: string; name: string; paid: boolean };
+  decidedByUser?: { id: number; username: string; fullName: string } | null;
+  rosterClashes?: RosterClash[];
+}
+
+export interface LeaveListParams {
+  nurseId?: number;
+  status?: string;
+  type?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Workforce Analytics (computed live from headcount / credentials / contracts /
+// roster / leave — see mock-workforce-routes.js and the future Nest module)
+// ---------------------------------------------------------------------------
+export interface AnalyticsSummary {
+  generatedAt: string;
+  headcount: {
+    total: number;
+    byStatus: Record<string, number>;
+    byEmploymentType: Record<string, number>;
+    byRole: Record<string, number>;
+    byUnit: Record<string, number>;
+  };
+  credentials: { total: number; expired: number; expiring30: number; pendingVerification: number };
+  contracts: { active: number; expiring90: number; withoutValidContract: number };
+  rosterNext7Days: { total: number; byStatus: Record<string, number> };
+  leave: { pendingApprovals: number; onLeaveToday: number };
+}
+
+export interface AnalyticsCredentials {
+  total: number;
+  byStatus: Record<string, number>;
+  byCategory: Record<string, number>;
+  expiring30: NurseCredential[];
+  expired: NurseCredential[];
+}
+
+export interface AnalyticsContracts {
+  total: number;
+  byStatus: Record<string, number>;
+  byAgency: Record<string, number>;
+  byType: Record<string, number>;
+  expiring90: any[];
+  uncoveredNurses: Array<{ id: number; employeeNumber: string; jobNo?: string; fullName: string }>;
+}
+
+export interface AnalyticsRosterDay {
+  date: string;
+  total: number;
+  byShift: Record<string, number>;
+  byStatus: Record<string, number>;
+}
+
+export interface AnalyticsRoster {
+  from: string;
+  to: string;
+  total: number;
+  daily: AnalyticsRosterDay[];
+  topNurses: Array<{ nurseId: number; fullName: string; employeeNumber?: string; assignments: number }>;
+}
+
+export interface AnalyticsLeave {
+  year: string;
+  requestsByStatus: Record<string, number>;
+  approvedDaysByType: Record<string, number>;
+  approvedDaysByMonth: Record<string, number>;
+  pending: LeaveRequest[];
+  lowBalances: Array<LeaveBalance & { fullName: string; employeeNumber: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// System Settings (Administration -> System Settings)
+// ---------------------------------------------------------------------------
+export interface SystemSettings {
+  hospitalName: string;
+  hospitalNameAr: string;
+  hospitalCode: string;
+  accessTokenTtlSec: number;
+  refreshTokenTtlSec: number;
+  maxSessionsPerUser: number;
+  passwordMinLength: number;
+  passwordRequireComplexity: boolean;
+  passwordExpiryDays: number;
+  lockoutMaxAttempts: number;
+  lockoutMinutes: number;
+  rosterHorizonDays: number;
+  rosterRequiresValidContract: boolean;
+  credentialAlertDays: number;
+  contractAlertDays: number;
+  maintenanceMode: boolean;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// RBAC Access Levels (Administration -> Access Level Master)
+// ---------------------------------------------------------------------------
+export interface AccessLevel {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  priority: number;
+  auto_assign: boolean;
+  override_allowed: boolean;
+  status: string;
+  roles: string[];
+  default_menus: string[];
+  created_at: string;
+  updated_at: string;
 }

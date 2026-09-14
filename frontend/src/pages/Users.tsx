@@ -171,7 +171,12 @@ export const Users: React.FC = () => {
       title: 'Username',
       dataIndex: 'username',
       key: 'username',
-      render: (v: string) => <Text strong>{v}</Text>,
+      render: (v: string, row: any) => (
+        <Space>
+          <Text strong>{v}</Text>
+          {row.isDemo && <Tag color="orange">TEMP</Tag>}
+        </Space>
+      ),
     },
     { title: 'Full Name', dataIndex: 'fullName', key: 'fullName' },
     { title: 'Email', dataIndex: 'email', key: 'email' },

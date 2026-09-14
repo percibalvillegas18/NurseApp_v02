@@ -3,64 +3,70 @@ import { Card, Row, Col, Statistic, Table, Tag, Typography, Alert, Space, Button
 import {
   TeamOutlined,
   ScheduleOutlined,
-  CheckCircleOutlined,
   ClockCircleOutlined,
   WarningOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { useAuth } from '../hooks/useAuth';
 import { useUserFullAccess, useAccessibleMenus } from '../hooks/useEffectiveAccess';
+import { useAnalyticsSummary } from '../hooks/useAnalytics';
+import { useRoster, rosterStatusColor } from '../hooks/useNursing';
 
 const { Title, Text } = Typography;
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const { data: fullAccess, isLoading: accessLoading } = useUserFullAccess();
+  const navigate = useNavigate();
+  const { data: fullAccess } = useUserFullAccess();
   const { data: menus } = useAccessibleMenus();
+  const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
+
+  const today = dayjs().format('YYYY-MM-DD');
+  const { data: rosterToday, isLoading: rosterLoading } = useRoster({ from: today, to: today });
 
   const stats = [
     {
-      title: 'Total Nurses',
-      value: 42,
+      title: 'Total Nurses (active)',
+      value: summary?.headcount.total ?? 0,
       icon: <TeamOutlined />,
       color: '#1677ff',
+      loading: summaryLoading,
     },
     {
       title: 'On Duty Today',
-      value: 18,
+      value: rosterToday?.items.length ?? 0,
       icon: <ScheduleOutlined />,
       color: '#52c41a',
+      loading: rosterLoading,
     },
     {
       title: 'Pending Leaves',
-      value: 5,
+      value: summary?.leave.pendingApprovals ?? 0,
       icon: <ClockCircleOutlined />,
       color: '#faad14',
+      loading: summaryLoading,
     },
     {
-      title: 'Credentials Expiring',
-      value: 3,
+      title: 'Credentials Expiring ≤30d',
+      value: summary?.credentials.expiring30 ?? 0,
       icon: <WarningOutlined />,
       color: '#ff4d4f',
+      loading: summaryLoading,
     },
-  ];
-
-  const recentRoster = [
-    { key: '1', nurse: 'Maria Garcia', unit: 'ICU_A', shift: 'Morning', status: 'Confirmed' },
-    { key: '2', nurse: 'Ahmed Hassan', unit: 'ICU_A', shift: 'Evening', status: 'Confirmed' },
-    { key: '3', nurse: 'Jennifer Smith', unit: 'ICU_A', shift: 'Night', status: 'Pending' },
-    { key: '4', nurse: 'David Kim', unit: 'ICU_A', shift: 'Morning', status: 'Confirmed' },
   ];
 
   const columns = [
-    { title: 'Nurse', dataIndex: 'nurse', key: 'nurse' },
-    { title: 'Unit', dataIndex: 'unit', key: 'unit' },
-    { title: 'Shift', dataIndex: 'shift', key: 'shift' },
+    { title: 'Nurse', dataIndex: 'nurseName', key: 'nurseName' },
+    { title: 'Unit', dataIndex: 'unitCode', key: 'unitCode' },
+    { title: 'Shift', dataIndex: 'shiftName', key: 'shiftName' },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={status === 'Confirmed' ? 'green' : 'orange'}>{status}</Tag>
+        <Tag color={rosterStatusColor[status] || 'default'}>{status}</Tag>
       ),
     },
   ];
@@ -82,10 +88,31 @@ export const Dashboard: React.FC = () => {
         style={{ marginBottom: 24 }}
       />
 
+      {(summary?.contracts.withoutValidContract || 0) > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Contract coverage gap"
+          description={`${summary?.contracts.withoutValidContract} active nurse(s) have no valid employment contract and cannot be rostered.`}
+          action={<Button size="small" onClick={() => navigate('/nursing/contract')}>Open contracts</Button>}
+        />
+      )}
+      {(summary?.credentials.expired || 0) > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Expired credentials"
+          description={`${summary?.credentials.expired} credential(s) are expired and need renewal.`}
+          action={<Button size="small" onClick={() => navigate('/nursing/credentials')}>Open credentials</Button>}
+        />
+      )}
+
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {stats.map((stat) => (
           <Col xs={24} sm={12} lg={6} key={stat.title}>
-            <Card>
+            <Card loading={stat.loading}>
               <Statistic
                 title={stat.title}
                 value={stat.value}
@@ -99,8 +126,22 @@ export const Dashboard: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
-          <Card title="Today's Roster" extra={<Button type="link">View All</Button>}>
-            <Table columns={columns} dataSource={recentRoster} pagination={false} size="small" />
+          <Card
+            title={`Today's Roster (${today})`}
+            extra={
+              <Button type="link" onClick={() => navigate('/scheduling/roster')}>
+                View All
+              </Button>
+            }
+            loading={rosterLoading}
+          >
+            <Table
+              rowKey="id"
+              columns={columns}
+              dataSource={rosterToday?.items || []}
+              pagination={false}
+              size="small"
+            />
           </Card>
         </Col>
 
@@ -122,10 +163,11 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <Text strong>Accessible Menus:</Text> {menus?.length || 'Loading...'}
+                  <Text strong>Accessible Menus:</Text> {menus?.length ?? 'Loading...'}
                 </div>
                 <div>
-                  <Text strong>Data Scope:</Text> <Tag>ICU_A</Tag> <Tag>Hospital</Tag>
+                  <Text strong>Granted Permissions:</Text>{' '}
+                  {fullAccess?.summary?.grantedPermissions ?? fullAccess?.fullMatrix?.length ?? 'Loading...'}
                 </div>
               </Space>
             </Card>
@@ -149,9 +191,13 @@ export const Dashboard: React.FC = () => {
 
             <Card title="Quick Actions" size="small">
               <Space direction="vertical" style={{ width: '100%' }}>
-                <Button block>View My Roster</Button>
-                <Button block>Request Leave</Button>
-                <Button block type="primary">
+                <Button block onClick={() => navigate('/scheduling/roster')}>
+                  View Roster
+                </Button>
+                <Button block onClick={() => navigate('/scheduling/leave')}>
+                  Request Leave
+                </Button>
+                <Button block type="primary" onClick={() => navigate('/admin/effective-access')}>
                   Evaluate My Access
                 </Button>
               </Space>
@@ -159,17 +205,6 @@ export const Dashboard: React.FC = () => {
           </Space>
         </Col>
       </Row>
-
-      {fullAccess && (
-        <Card title="Full Access Matrix (Debug)" style={{ marginTop: 16 }} size="small">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            This shows raw output of rbac.get_user_full_access({user?.id}) - {fullAccess.summary?.totalRows || fullAccess.fullMatrix?.length} combinations
-          </Text>
-          <div style={{ maxHeight: 200, overflow: 'auto', marginTop: 8, fontSize: 11, background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
-            <pre>{JSON.stringify(fullAccess.summary || { accessibleMenus: menus?.length }, null, 2)}</pre>
-          </div>
-        </Card>
-      )}
     </div>
   );
 };

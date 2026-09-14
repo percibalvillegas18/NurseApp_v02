@@ -96,6 +96,10 @@ module.exports = function registerContractRoutes(app, deps) {
     );
   }
   app.locals.hasValidContract = hasValidContract;
+  // Exposed for the workforce module (analytics coverage + leave roster interplay)
+  app.locals.mockContracts = mockContracts;
+  // Lets the demo seed reserve contract IDs without later POST /contracts collisions
+  app.locals.bumpContractSeq = (min) => { mockContractSeq = Math.max(mockContractSeq, min); };
 
   function contractAction(id, toStatus, reason) {
     const c = mockContracts.find((x) => x.id === id);
