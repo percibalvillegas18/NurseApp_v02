@@ -220,7 +220,7 @@ export class RbacController {
   }
 
   @Post('effective-access/:userId/evaluate')
-  @UseGuards(AuthGuard('jwt'))
+  @RequirePermission({ menuCode: 'USER_MANAGEMENT', permissionCode: 'VIEW' })
   async evaluateAccess(
     @Param('userId') userId: string,
     @Body() body: { menuCode: string; permissionCode: string; resourceId?: number; resourceType?: string },
