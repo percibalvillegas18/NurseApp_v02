@@ -262,8 +262,10 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_evaluate_access_user ON rbac.role_menu_access(role_code, status) WHERE status = 'Active';
-CREATE INDEX IF NOT EXISTS idx_evaluate_access_perm ON rbac.role_permissions(role_code, menu_id, status) WHERE status = 'Active';
+-- NOTE (repair 2026-09): the role_code indexes lived here originally, but role_code
+-- is only added to role_menu_access/role_permissions in V2_2. Creating them here
+-- aborted the whole V2_0 transaction on fresh DBs ("column role_code does not exist").
+-- They now live in V2_2 (idx_role_menu_access_role_code / idx_role_permissions_role_code).
 CREATE INDEX IF NOT EXISTS idx_evaluate_access_scope ON rbac.user_data_scopes(user_id, status) WHERE status = 'Active';
 
 SELECT 'V2_0__effective_access_function completed' as status;

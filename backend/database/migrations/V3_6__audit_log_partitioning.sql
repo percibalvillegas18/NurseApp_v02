@@ -209,7 +209,11 @@ BEGIN
       AND c.relkind = 'r'
   LOOP
     -- bound_expr looks like: FOR VALUES FROM ('2024-01-01') TO ('2024-02-01')
-    v_to := substring(r.bound_expr from $$TO \('([0-9-]+)'\)$$)::date;
+    -- NOTE (repair 2026-09): the regex literal MUST use a distinct dollar-quote
+    -- tag. The original nested quote terminated the function body early and the
+    -- file failed with 'syntax error at or near "TO"'. Do NOT write the body's
+    -- own quote tag anywhere in here, not even inside a comment.
+    v_to := substring(r.bound_expr from $re$TO \('([0-9-]+)'\)$re$)::date;
     IF v_to IS NOT NULL AND v_to <= v_cutoff THEN
       EXECUTE format('DROP TABLE IF EXISTS audit.%I', r.part_name);
       dropped_partition := 'audit.' || r.part_name;

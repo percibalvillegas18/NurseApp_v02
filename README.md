@@ -238,6 +238,7 @@ Aggregates **all** active roles (not only `primary_role_id`), `BOOL_OR` on menu 
 | `docs/LEAVE_MANAGEMENT.md` | Leave lifecycle, balances, roster interplay (mock + UI live, Nest TODO) |
 | `docs/WORKFORCE_ANALYTICS.md` | Live-computed workforce KPIs (mock + UI live, Nest TODO) |
 | `docs/STAFF_CREDENTIAL_TRACKING.md` | Credential templates & tracking |
+| `docs/LARAVEL_CONVERSION.md` | PostgreSQL readiness (done) + NestJS → Laravel mapping & phased plan |
 | `REDIS_CACHING.md` | Cache keys and invalidation |
 | `ANALYSIS.md` | Deep analysis |
 | `backend/README.md` | Backend-specific notes |
